@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2b6028483578b94fba7ad2420531818, type: 3}
+  m_Name: Level_02
+  m_EditorClassIdentifier: Assembly-CSharp::RFIDBaggage.Levels.LevelConfig
+  levelId: Level_02
+  displayName: Test Level 02
+  rfidId: RFID_02
+  introVideoRelativePath: Videos/Level02/Level02_Intro.mp4
+  successVideoRelativePath: Videos/Level02/Level02_Success.mp4
+  failureVideoRelativePath: Videos/Level02/Level02_Failure.mp4
+  finalFrameImageRelativePath: Images/Level02/Level02_FinalFrame.png
+  gameplayDuration: 15
+  inputCooldown: 0.2
+  wrongSelectionDeductsTime: 0
+  wrongSelectionTimePenalty: 0

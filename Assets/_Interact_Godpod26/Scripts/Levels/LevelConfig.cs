@@ -1,0 +1,121 @@
+using UnityEngine;
+
+namespace RFIDBaggage.Levels
+{
+    [CreateAssetMenu(
+        fileName = "LevelConfig",
+        menuName = "RFID Baggage/Level Config"
+    )]
+    public sealed class LevelConfig : ScriptableObject
+    {
+        [Header("Basic")]
+        [SerializeField, Tooltip("Unique level identifier, for example Level_01.")]
+        private string levelId;
+
+        [SerializeField, Tooltip("Display name used in logs and future UI.")]
+        private string displayName;
+
+        [SerializeField, Tooltip("RFID identifier that starts this level.")]
+        private string rfidId;
+
+        [Header("StreamingAssets Relative Paths")]
+        [SerializeField, Tooltip("Intro video path relative to StreamingAssets.")]
+        private string introVideoRelativePath;
+
+        [SerializeField, Tooltip("Success video path relative to StreamingAssets.")]
+        private string successVideoRelativePath;
+
+        [SerializeField, Tooltip("Failure video path relative to StreamingAssets.")]
+        private string failureVideoRelativePath;
+
+        [SerializeField, Tooltip("Final-frame image path relative to StreamingAssets.")]
+        private string finalFrameImageRelativePath;
+
+        [Header("Gameplay Rules")]
+        [SerializeField, Min(0.1f), Tooltip("Gameplay duration in seconds.")]
+        private float gameplayDuration = 15f;
+
+        [SerializeField, Min(0f), Tooltip("Cooldown after confirm input in seconds.")]
+        private float inputCooldown = 0.2f;
+
+        [SerializeField, Tooltip("Whether a wrong selection deducts time.")]
+        private bool wrongSelectionDeductsTime;
+
+        [SerializeField, Min(0f), Tooltip("Seconds deducted when wrongSelectionDeductsTime is enabled.")]
+        private float wrongSelectionTimePenalty;
+
+        public string LevelId => levelId;
+        public string DisplayName => displayName;
+        public string RfidId => rfidId;
+        public string IntroVideoRelativePath => introVideoRelativePath;
+        public string SuccessVideoRelativePath => successVideoRelativePath;
+        public string FailureVideoRelativePath => failureVideoRelativePath;
+        public string FinalFrameImageRelativePath => finalFrameImageRelativePath;
+        public float GameplayDuration => gameplayDuration;
+        public float InputCooldown => inputCooldown;
+        public bool WrongSelectionDeductsTime => wrongSelectionDeductsTime;
+        public float WrongSelectionTimePenalty => wrongSelectionTimePenalty;
+
+        public bool IsValid(out string message)
+        {
+            if (string.IsNullOrWhiteSpace(levelId))
+            {
+                message = $"{name} has an empty level ID.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(rfidId))
+            {
+                message = $"{name} has an empty RFID ID.";
+                return false;
+            }
+
+            if (gameplayDuration <= 0f)
+            {
+                message = $"{name} has an invalid gameplay duration.";
+                return false;
+            }
+
+            if (inputCooldown < 0f)
+            {
+                message = $"{name} has an invalid input cooldown.";
+                return false;
+            }
+
+            if (wrongSelectionTimePenalty < 0f)
+            {
+                message = $"{name} has an invalid wrong selection time penalty.";
+                return false;
+            }
+
+            message = string.Empty;
+            return true;
+        }
+
+        public string GetNormalizedLevelId()
+        {
+            return NormalizeIdentifier(levelId);
+        }
+
+        public string GetNormalizedRfidId()
+        {
+            return NormalizeIdentifier(rfidId);
+        }
+
+        public static string NormalizeIdentifier(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
+        }
+
+        private void OnValidate()
+        {
+            if (gameplayDuration <= 0f)
+            {
+                gameplayDuration = 15f;
+            }
+
+            inputCooldown = Mathf.Max(0f, inputCooldown);
+            wrongSelectionTimePenalty = Mathf.Max(0f, wrongSelectionTimePenalty);
+        }
+    }
+}

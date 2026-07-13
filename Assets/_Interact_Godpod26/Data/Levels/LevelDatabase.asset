@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: aa21b1f95d74b8b43b2860fffeb35837, type: 3}
+  m_Name: LevelDatabase
+  m_EditorClassIdentifier: Assembly-CSharp::RFIDBaggage.Levels.LevelDatabase
+  levels:
+  - {fileID: 11400000, guid: 2ddda6dbe920c954ba9a7a8ef96faa83, type: 2}
+  - {fileID: 11400000, guid: 8647dd94b299d0844962811ef6b1ae02, type: 2}
+  - {fileID: 11400000, guid: c8c0fdc2e1108c4489b8f099d02f8434, type: 2}
+  - {fileID: 11400000, guid: 0b4328141896ef54e9250be9520e6e71, type: 2}
+  - {fileID: 11400000, guid: 7971260917abbeb4bae61d14fe27e2af, type: 2}
+  - {fileID: 11400000, guid: c77e49b805d91d54c97650a512e75804, type: 2}
