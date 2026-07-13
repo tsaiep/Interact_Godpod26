@@ -23,6 +23,9 @@ namespace RFIDBaggage.Input
             "RFID_06"
         };
 
+        [SerializeField, Tooltip("Enable first-stage manual phase keys I/P/O/G/R/E. Keep disabled for phase 2 video flow tests.")]
+        private bool enableManualPhaseKeys;
+
         private void Update()
         {
             if (gameFlowManager == null)
@@ -31,7 +34,12 @@ namespace RFIDBaggage.Input
             }
 
             HandleLevelKeys();
-            HandleFlowKeys();
+            HandleResultKeys();
+
+            if (enableManualPhaseKeys)
+            {
+                HandleManualPhaseKeys();
+            }
         }
 
         private void HandleLevelKeys()
@@ -61,7 +69,25 @@ namespace RFIDBaggage.Input
             }
         }
 
-        private void HandleFlowKeys()
+        private void HandleResultKeys()
+        {
+            if (UnityEngine.Input.GetKeyDown(KeyCode.S))
+            {
+                gameFlowManager.NotifyGameSuccess();
+            }
+
+            if (UnityEngine.Input.GetKeyDown(KeyCode.F))
+            {
+                gameFlowManager.NotifyGameFailure();
+            }
+
+            if (UnityEngine.Input.GetKeyDown(KeyCode.Escape))
+            {
+                gameFlowManager.ReportRecoverableError("Debug safe reset requested with Escape.");
+            }
+        }
+
+        private void HandleManualPhaseKeys()
         {
             if (UnityEngine.Input.GetKeyDown(KeyCode.I))
             {
@@ -101,11 +127,6 @@ namespace RFIDBaggage.Input
             if (UnityEngine.Input.GetKeyDown(KeyCode.E))
             {
                 gameFlowManager.NotifyResultCompleted();
-            }
-
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Escape))
-            {
-                gameFlowManager.ReportRecoverableError("Debug safe reset requested with Escape.");
             }
         }
     }

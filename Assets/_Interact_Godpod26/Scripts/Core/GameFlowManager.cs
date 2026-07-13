@@ -1,21 +1,143 @@
 using System;
+using System.Collections.Generic;
 using RFIDBaggage.Levels;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace RFIDBaggage.Core
 {
+    [Serializable]
+    public sealed class GameStateUnityEvent : UnityEvent<GameState>
+    {
+    }
+
+    [Serializable]
+    public sealed class GameFlowStateEvents
+    {
+        [SerializeField] private GameStateUnityEvent onStateEntered = new GameStateUnityEvent();
+        [SerializeField] private UnityEvent onSystemInitializingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onIdlePreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onIdleEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onLevelInitializingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onIntroPreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onIntroPlayingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onGamePreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onGameplayEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onSuccessPreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onSuccessPlayingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onFailurePreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onFailurePlayingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onResettingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onErrorRecoveryEntered = new UnityEvent();
+
+        public void Invoke(GameState state)
+        {
+            InvokeSafely(() => onStateEntered.Invoke(state), $"onStateEntered({state})");
+
+            switch (state)
+            {
+                case GameState.SystemInitializing:
+                    InvokeSafely(onSystemInitializingEntered.Invoke, nameof(onSystemInitializingEntered));
+                    break;
+                case GameState.IdlePreparing:
+                    InvokeSafely(onIdlePreparingEntered.Invoke, nameof(onIdlePreparingEntered));
+                    break;
+                case GameState.Idle:
+                    InvokeSafely(onIdleEntered.Invoke, nameof(onIdleEntered));
+                    break;
+                case GameState.LevelInitializing:
+                    InvokeSafely(onLevelInitializingEntered.Invoke, nameof(onLevelInitializingEntered));
+                    break;
+                case GameState.IntroPreparing:
+                    InvokeSafely(onIntroPreparingEntered.Invoke, nameof(onIntroPreparingEntered));
+                    break;
+                case GameState.IntroPlaying:
+                    InvokeSafely(onIntroPlayingEntered.Invoke, nameof(onIntroPlayingEntered));
+                    break;
+                case GameState.GamePreparing:
+                    InvokeSafely(onGamePreparingEntered.Invoke, nameof(onGamePreparingEntered));
+                    break;
+                case GameState.Gameplay:
+                    InvokeSafely(onGameplayEntered.Invoke, nameof(onGameplayEntered));
+                    break;
+                case GameState.SuccessPreparing:
+                    InvokeSafely(onSuccessPreparingEntered.Invoke, nameof(onSuccessPreparingEntered));
+                    break;
+                case GameState.SuccessPlaying:
+                    InvokeSafely(onSuccessPlayingEntered.Invoke, nameof(onSuccessPlayingEntered));
+                    break;
+                case GameState.FailurePreparing:
+                    InvokeSafely(onFailurePreparingEntered.Invoke, nameof(onFailurePreparingEntered));
+                    break;
+                case GameState.FailurePlaying:
+                    InvokeSafely(onFailurePlayingEntered.Invoke, nameof(onFailurePlayingEntered));
+                    break;
+                case GameState.Resetting:
+                    InvokeSafely(onResettingEntered.Invoke, nameof(onResettingEntered));
+                    break;
+                case GameState.ErrorRecovery:
+                    InvokeSafely(onErrorRecoveryEntered.Invoke, nameof(onErrorRecoveryEntered));
+                    break;
+            }
+        }
+
+        private static void InvokeSafely(Action action, string eventName)
+        {
+            try
+            {
+                action.Invoke();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new Exception($"[GameFlow] UnityEvent failed: {eventName}", exception));
+            }
+        }
+    }
+
     public sealed class GameFlowManager : MonoBehaviour
     {
+        private static readonly GameState[] StateSequence =
+        {
+            GameState.SystemInitializing,
+            GameState.IdlePreparing,
+            GameState.Idle,
+            GameState.LevelInitializing,
+            GameState.IntroPreparing,
+            GameState.IntroPlaying,
+            GameState.GamePreparing,
+            GameState.Gameplay,
+            GameState.SuccessPreparing,
+            GameState.SuccessPlaying,
+            GameState.FailurePreparing,
+            GameState.FailurePlaying,
+            GameState.Resetting,
+            GameState.ErrorRecovery
+        };
+
+        private static readonly IReadOnlyList<GameState> ReadOnlyStateSequence = Array.AsReadOnly(StateSequence);
+
         [SerializeField, Tooltip("Database used to map RFID IDs to level configs.")]
         private LevelDatabase levelDatabase;
 
         [SerializeField, Tooltip("When enabled, the flow automatically enters Idle on Start.")]
         private bool enterIdleOnStart = true;
 
+        [Header("Runtime Debug")]
+        [SerializeField, Tooltip("All flow states for Inspector display only. This list is not used to drive state transitions.")]
+        private GameState[] visibleStateSequence = (GameState[])StateSequence.Clone();
+
+        [SerializeField, Tooltip("Current flow state. Runtime display only; do not edit during Play Mode.")]
         private GameState currentState = GameState.SystemInitializing;
+
+        [Header("State Unity Events")]
+        [SerializeField, Tooltip("Inspector events invoked after a legal state transition.")]
+        private GameFlowStateEvents stateEvents = new GameFlowStateEvents();
+
         private LevelConfig currentLevel;
         private bool resultLocked;
+        private bool logResetCompleteWhenIdle;
 
+        public IReadOnlyList<GameState> AllStates => ReadOnlyStateSequence;
         public GameState CurrentState => currentState;
         public LevelConfig CurrentLevel => currentLevel;
 
@@ -25,6 +147,11 @@ namespace RFIDBaggage.Core
         public event Action<LevelConfig, bool> LevelFinished;
         public event Action LevelReset;
 
+        private void OnValidate()
+        {
+            visibleStateSequence = (GameState[])StateSequence.Clone();
+        }
+
         private void Start()
         {
             if (!enterIdleOnStart)
@@ -33,7 +160,11 @@ namespace RFIDBaggage.Core
             }
 
             TransitionTo(GameState.IdlePreparing);
-            TransitionTo(GameState.Idle);
+        }
+
+        public void NotifyIdlePrepared()
+        {
+            NotifyExpected(GameState.IdlePreparing, GameState.Idle, "idle prepared");
         }
 
         public bool RequestStartLevelByRfid(string rfidId)
@@ -83,7 +214,7 @@ namespace RFIDBaggage.Core
                 return false;
             }
 
-            LevelStarted?.Invoke(level);
+            InvokeLevelStarted(level);
             return true;
         }
 
@@ -106,7 +237,7 @@ namespace RFIDBaggage.Core
         {
             if (NotifyExpected(GameState.GamePreparing, GameState.Gameplay, "game prepared"))
             {
-                GameplayStarted?.Invoke(currentLevel);
+                InvokeGameplayStarted(currentLevel);
             }
         }
 
@@ -184,7 +315,7 @@ namespace RFIDBaggage.Core
             string levelId = currentLevel != null ? currentLevel.LevelId : "<none>";
 
             Debug.Log($"[GameFlow] {levelId} Result: {result}", this);
-            LevelFinished?.Invoke(currentLevel, success);
+            InvokeLevelFinished(currentLevel, success);
             TransitionTo(success ? GameState.SuccessPreparing : GameState.FailurePreparing);
         }
 
@@ -211,7 +342,7 @@ namespace RFIDBaggage.Core
             {
                 currentLevel = null;
                 resultLocked = false;
-                LevelReset?.Invoke();
+                InvokeLevelReset();
                 Debug.Log("[GameFlow] Reset complete. Returned to Idle.", this);
                 return;
             }
@@ -228,11 +359,10 @@ namespace RFIDBaggage.Core
 
             currentLevel = null;
             resultLocked = false;
-            LevelReset?.Invoke();
+            InvokeLevelReset();
 
+            logResetCompleteWhenIdle = true;
             TransitionTo(GameState.IdlePreparing);
-            TransitionTo(GameState.Idle);
-            Debug.Log("[GameFlow] Reset complete. Returned to Idle.", this);
         }
 
         private bool TransitionTo(GameState nextState)
@@ -252,8 +382,121 @@ namespace RFIDBaggage.Core
             GameState previousState = currentState;
             currentState = nextState;
             Debug.Log($"[GameFlow] {previousState} -> {nextState}", this);
-            StateChanged?.Invoke(previousState, nextState);
+            InvokeStateChanged(previousState, nextState);
+            stateEvents.Invoke(nextState);
+
+            if (nextState == GameState.Idle && previousState == GameState.IdlePreparing && logResetCompleteWhenIdle)
+            {
+                logResetCompleteWhenIdle = false;
+                Debug.Log("[GameFlow] Reset complete. Returned to Idle.", this);
+            }
+
             return true;
+        }
+
+        private void InvokeStateChanged(GameState previousState, GameState nextState)
+        {
+            Action<GameState, GameState> handlers = StateChanged;
+            if (handlers == null)
+            {
+                return;
+            }
+
+            foreach (Action<GameState, GameState> handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler.Invoke(previousState, nextState);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new Exception("[GameFlow] StateChanged handler failed.", exception), this);
+                }
+            }
+        }
+
+        private void InvokeLevelStarted(LevelConfig level)
+        {
+            Action<LevelConfig> handlers = LevelStarted;
+            if (handlers == null)
+            {
+                return;
+            }
+
+            foreach (Action<LevelConfig> handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler.Invoke(level);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new Exception("[GameFlow] LevelStarted handler failed.", exception), this);
+                }
+            }
+        }
+
+        private void InvokeGameplayStarted(LevelConfig level)
+        {
+            Action<LevelConfig> handlers = GameplayStarted;
+            if (handlers == null)
+            {
+                return;
+            }
+
+            foreach (Action<LevelConfig> handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler.Invoke(level);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new Exception("[GameFlow] GameplayStarted handler failed.", exception), this);
+                }
+            }
+        }
+
+        private void InvokeLevelFinished(LevelConfig level, bool success)
+        {
+            Action<LevelConfig, bool> handlers = LevelFinished;
+            if (handlers == null)
+            {
+                return;
+            }
+
+            foreach (Action<LevelConfig, bool> handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler.Invoke(level, success);
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new Exception("[GameFlow] LevelFinished handler failed.", exception), this);
+                }
+            }
+        }
+
+        private void InvokeLevelReset()
+        {
+            Action handlers = LevelReset;
+            if (handlers == null)
+            {
+                return;
+            }
+
+            foreach (Action handler in handlers.GetInvocationList())
+            {
+                try
+                {
+                    handler.Invoke();
+                }
+                catch (Exception exception)
+                {
+                    Debug.LogException(new Exception("[GameFlow] LevelReset handler failed.", exception), this);
+                }
+            }
         }
 
         private static bool IsLegalTransition(GameState from, GameState to)
