@@ -39,6 +39,9 @@ namespace RFIDBaggage.Levels
         [SerializeField, Min(0.1f), Tooltip("Gameplay duration in seconds.")]
         private float gameplayDuration = 15f;
 
+        [SerializeField, Min(0f), Tooltip("Delay after entering Gameplay before input and countdown start.")]
+        private float gameplayStartDelay;
+
         [SerializeField, Min(0f), Tooltip("Countdown warning threshold in seconds.")]
         private float warningStartTime = 5f;
 
@@ -66,6 +69,7 @@ namespace RFIDBaggage.Levels
         public string FinalFrameImageRelativePath => finalFrameImageRelativePath;
         public GameObject LevelRoot => levelRoot;
         public float GameplayDuration => gameplayDuration;
+        public float GameplayStartDelay => gameplayStartDelay;
         public float WarningStartTime => warningStartTime;
         public float SelectionInputCooldown => selectionInputCooldown;
         public float ConfirmInputCooldown => confirmInputCooldown > 0f ? confirmInputCooldown : inputCooldown;
@@ -96,6 +100,12 @@ namespace RFIDBaggage.Levels
             if (inputCooldown < 0f)
             {
                 message = $"{name} has an invalid input cooldown.";
+                return false;
+            }
+
+            if (gameplayStartDelay < 0f)
+            {
+                message = $"{name} has an invalid gameplay start delay.";
                 return false;
             }
 
@@ -144,6 +154,7 @@ namespace RFIDBaggage.Levels
             }
 
             inputCooldown = Mathf.Max(0f, inputCooldown);
+            gameplayStartDelay = Mathf.Max(0f, gameplayStartDelay);
             warningStartTime = Mathf.Max(0f, warningStartTime);
             selectionInputCooldown = Mathf.Max(0f, selectionInputCooldown);
             confirmInputCooldown = Mathf.Max(0f, confirmInputCooldown);

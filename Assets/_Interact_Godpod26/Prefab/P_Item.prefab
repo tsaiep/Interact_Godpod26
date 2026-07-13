@@ -3097,7 +3097,7 @@ MonoBehaviour:
         NewScale: {x: 0, y: 0}
         NewVector: {x: 0, y: 0, z: 0, w: 0}
         InterpolateValue: 0
-        Duration: 0.001
+        Duration: 0.1
         InterpolationCurve:
           MMTweenDefinitionType: 1
           MMTweenCurve: 4
@@ -3106,10 +3106,10 @@ MonoBehaviour:
             m_Curve:
             - serializedVersion: 3
               time: 0
-              value: 1
-              inSlope: 0
-              outSlope: 0
-              tangentMode: 34
+              value: 0
+              inSlope: 2
+              outSlope: 2
+              tangentMode: 0
               weightedMode: 0
               inWeight: 0
               outWeight: 0
@@ -3118,7 +3118,7 @@ MonoBehaviour:
               value: 1
               inSlope: 0
               outSlope: 0
-              tangentMode: 34
+              tangentMode: 0
               weightedMode: 0
               inWeight: 0
               outWeight: 0

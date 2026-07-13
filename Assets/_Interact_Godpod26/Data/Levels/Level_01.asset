@@ -19,7 +19,12 @@ MonoBehaviour:
   successVideoRelativePath: Videos/Level01/Level01_Success.mp4
   failureVideoRelativePath: Videos/Level01/Level01_Failure.mp4
   finalFrameImageRelativePath: Images/Level01/Level01_FinalFrame.png
+  levelRoot: {fileID: 0}
   gameplayDuration: 15
+  gameplayStartDelay: 3
+  warningStartTime: 5
+  selectionInputCooldown: 0.15
+  confirmInputCooldown: 0.25
   inputCooldown: 0.2
   wrongSelectionDeductsTime: 0
   wrongSelectionTimePenalty: 0

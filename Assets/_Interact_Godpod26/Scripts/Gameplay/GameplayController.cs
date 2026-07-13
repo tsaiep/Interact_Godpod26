@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections;
 using RFIDBaggage.Core;
 using RFIDBaggage.Levels;
 using RFIDBaggage.Selection;
@@ -101,6 +102,7 @@ namespace RFIDBaggage.Gameplay
         private bool gameplayRunning;
         private bool resultReported;
         private bool warningTriggered;
+        private Coroutine gameplayStartDelayCoroutine;
 
         public float RemainingTime => remainingTime;
         public int TotalContrabandCount => totalContrabandCount;
@@ -246,10 +248,53 @@ namespace RFIDBaggage.Gameplay
 
             SelectableItem defaultItem = ResolveDefaultItem(currentView);
             selectionController.Initialize(currentItems, defaultItem, level.SelectionInputCooldown, level.ConfirmInputCooldown);
-            selectionController.EnableInput();
+            selectionController.DisableInput();
 
-            gameplayRunning = true;
             Debug.Log($"[Gameplay] Items: {currentItems.Count}, Contraband: {totalContrabandCount}", this);
+
+            StopCoroutineIfRunning(ref gameplayStartDelayCoroutine);
+            float startDelay = Mathf.Max(0f, level.GameplayStartDelay);
+            if (startDelay > 0f)
+            {
+                Debug.Log($"[Gameplay] Start delay: {startDelay:0.###} seconds.", this);
+                gameplayStartDelayCoroutine = StartCoroutine(GameplayStartDelayRoutine(startDelay));
+            }
+            else
+            {
+                StartGameplayTimerAndInput();
+            }
+        }
+
+        private IEnumerator GameplayStartDelayRoutine(float delay)
+        {
+            float startTime = Time.unscaledTime;
+
+            while (gameFlowManager.CurrentState == GameState.Gameplay &&
+                   !resultReported &&
+                   Time.unscaledTime - startTime < delay)
+            {
+                yield return null;
+            }
+
+            gameplayStartDelayCoroutine = null;
+
+            if (gameFlowManager.CurrentState != GameState.Gameplay || resultReported)
+            {
+                yield break;
+            }
+
+            StartGameplayTimerAndInput();
+        }
+
+        private void StartGameplayTimerAndInput()
+        {
+            gameplayRunning = true;
+
+            if (selectionController != null)
+            {
+                selectionController.EnableInput();
+            }
+
             onGameplayStarted.Invoke();
         }
 
@@ -364,6 +409,8 @@ namespace RFIDBaggage.Gameplay
                 selectionController.DisableInput();
                 selectionController.ClearSelection();
             }
+
+            StopCoroutineIfRunning(ref gameplayStartDelayCoroutine);
         }
 
         private void ResetGameplay()
@@ -371,6 +418,7 @@ namespace RFIDBaggage.Gameplay
             gameplayRunning = false;
             resultReported = false;
             warningTriggered = false;
+            StopCoroutineIfRunning(ref gameplayStartDelayCoroutine);
             foundContrabandCount = 0;
             totalContrabandCount = 0;
             remainingTime = 0f;
@@ -406,6 +454,17 @@ namespace RFIDBaggage.Gameplay
             SetLevelRootsActive(string.Empty);
             onGameplayReset.Invoke();
             Debug.Log("[Gameplay] Reset completed.", this);
+        }
+
+        private void StopCoroutineIfRunning(ref Coroutine coroutine)
+        {
+            if (coroutine == null)
+            {
+                return;
+            }
+
+            StopCoroutine(coroutine);
+            coroutine = null;
         }
 
         private void UpdateCountdownUi()
