@@ -19,9 +19,6 @@ namespace RFIDBaggage.Selection
         [SerializeField, Tooltip("Position used for screen-space navigation. Uses this transform when empty.")]
         private Transform selectionPoint;
 
-        [SerializeField, Tooltip("Visual root hidden by default correct handling and restored on reset. Uses this GameObject when empty.")]
-        private GameObject visualRoot;
-
         [SerializeField, Tooltip("Whether this item starts selectable when reset.")]
         private bool initiallySelectable = true;
 
@@ -46,11 +43,6 @@ namespace RFIDBaggage.Selection
 
         private void Awake()
         {
-            if (visualRoot == null)
-            {
-                visualRoot = gameObject;
-            }
-
             IsSelectable = initiallySelectable;
         }
 
@@ -94,11 +86,6 @@ namespace RFIDBaggage.Selection
             IsSelectable = false;
             SetSelected(false);
             onCorrect.Invoke();
-
-            if (visualRoot != null)
-            {
-                visualRoot.SetActive(false);
-            }
         }
 
         public void PlayWrongFeedback()
@@ -111,12 +98,6 @@ namespace RFIDBaggage.Selection
             IsResolved = false;
             IsSelectable = initiallySelectable;
             SetSelected(false);
-
-            if (visualRoot != null)
-            {
-                visualRoot.SetActive(true);
-            }
-
             onReset.Invoke();
         }
     }
