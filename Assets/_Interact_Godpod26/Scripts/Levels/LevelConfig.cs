@@ -31,11 +31,24 @@ namespace RFIDBaggage.Levels
         [SerializeField, Tooltip("Final-frame image path relative to StreamingAssets.")]
         private string finalFrameImageRelativePath;
 
+        [Header("Scene References")]
+        [SerializeField, Tooltip("Optional level root. Prefer GameplayController Level Views for scene object references.")]
+        private GameObject levelRoot;
+
         [Header("Gameplay Rules")]
         [SerializeField, Min(0.1f), Tooltip("Gameplay duration in seconds.")]
         private float gameplayDuration = 15f;
 
+        [SerializeField, Min(0f), Tooltip("Countdown warning threshold in seconds.")]
+        private float warningStartTime = 5f;
+
+        [SerializeField, Min(0f), Tooltip("Cooldown after direction navigation input in seconds.")]
+        private float selectionInputCooldown = 0.15f;
+
         [SerializeField, Min(0f), Tooltip("Cooldown after confirm input in seconds.")]
+        private float confirmInputCooldown = 0.25f;
+
+        [SerializeField, Min(0f), Tooltip("Legacy confirm cooldown. Kept for compatibility with phase 1 assets.")]
         private float inputCooldown = 0.2f;
 
         [SerializeField, Tooltip("Whether a wrong selection deducts time.")]
@@ -51,7 +64,11 @@ namespace RFIDBaggage.Levels
         public string SuccessVideoRelativePath => successVideoRelativePath;
         public string FailureVideoRelativePath => failureVideoRelativePath;
         public string FinalFrameImageRelativePath => finalFrameImageRelativePath;
+        public GameObject LevelRoot => levelRoot;
         public float GameplayDuration => gameplayDuration;
+        public float WarningStartTime => warningStartTime;
+        public float SelectionInputCooldown => selectionInputCooldown;
+        public float ConfirmInputCooldown => confirmInputCooldown > 0f ? confirmInputCooldown : inputCooldown;
         public float InputCooldown => inputCooldown;
         public bool WrongSelectionDeductsTime => wrongSelectionDeductsTime;
         public float WrongSelectionTimePenalty => wrongSelectionTimePenalty;
@@ -79,6 +96,18 @@ namespace RFIDBaggage.Levels
             if (inputCooldown < 0f)
             {
                 message = $"{name} has an invalid input cooldown.";
+                return false;
+            }
+
+            if (selectionInputCooldown < 0f)
+            {
+                message = $"{name} has an invalid selection input cooldown.";
+                return false;
+            }
+
+            if (confirmInputCooldown < 0f)
+            {
+                message = $"{name} has an invalid confirm input cooldown.";
                 return false;
             }
 
@@ -115,6 +144,9 @@ namespace RFIDBaggage.Levels
             }
 
             inputCooldown = Mathf.Max(0f, inputCooldown);
+            warningStartTime = Mathf.Max(0f, warningStartTime);
+            selectionInputCooldown = Mathf.Max(0f, selectionInputCooldown);
+            confirmInputCooldown = Mathf.Max(0f, confirmInputCooldown);
             wrongSelectionTimePenalty = Mathf.Max(0f, wrongSelectionTimePenalty);
         }
     }

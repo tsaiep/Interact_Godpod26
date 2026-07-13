@@ -95,6 +95,9 @@ namespace RFIDBaggage.DebugTools.Editor
             SetPrivateField(level, "failureVideoRelativePath", $"Videos/{folder}/{folder}_Failure.mp4");
             SetPrivateField(level, "finalFrameImageRelativePath", $"Images/{folder}/{folder}_FinalFrame.png");
             SetPrivateField(level, "gameplayDuration", 15f);
+            SetPrivateField(level, "warningStartTime", 5f);
+            SetPrivateField(level, "selectionInputCooldown", 0.15f);
+            SetPrivateField(level, "confirmInputCooldown", 0.25f);
             SetPrivateField(level, "inputCooldown", 0.2f);
             SetPrivateField(level, "wrongSelectionDeductsTime", false);
             SetPrivateField(level, "wrongSelectionTimePenalty", 0f);
