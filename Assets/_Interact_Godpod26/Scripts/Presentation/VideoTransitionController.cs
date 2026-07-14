@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace RFIDBaggage.Presentation
 {
@@ -14,8 +15,12 @@ namespace RFIDBaggage.Presentation
         [SerializeField, Tooltip("Renderer displaying intro/result video RenderTexture.")]
         private Renderer contentVideoRenderer;
 
-        [SerializeField, Tooltip("Texture assigned to the content video renderer, usually RT_ContentVideo.")]
-        private Texture contentVideoTexture;
+        [FormerlySerializedAs("contentVideoTexture")]
+        [SerializeField, Tooltip("Texture assigned to ContentVideoPlayerA, usually RT_ContentA.")]
+        private Texture contentVideoTextureA;
+
+        [SerializeField, Tooltip("Texture assigned to ContentVideoPlayerB, usually RT_ContentB.")]
+        private Texture contentVideoTextureB;
 
         [SerializeField, Tooltip("Renderer displaying the final-frame static background texture.")]
         private Renderer staticBackgroundRenderer;
@@ -59,7 +64,17 @@ namespace RFIDBaggage.Presentation
 
         public void ShowContentVideo()
         {
-            SetRendererTexture(contentVideoRenderer, contentVideoTexture, ref contentPropertyBlock);
+            ShowContentVideo(contentVideoTextureA);
+        }
+
+        public void ShowContentVideoB()
+        {
+            ShowContentVideo(contentVideoTextureB);
+        }
+
+        public void ShowContentVideo(Texture contentTexture)
+        {
+            SetRendererTexture(contentVideoRenderer, contentTexture, ref contentPropertyBlock);
             SetVisible(contentVideoRenderer, true);
             SetVisible(idleVideoRenderer, false);
             SetVisible(staticBackgroundRenderer, false);
@@ -101,20 +116,25 @@ namespace RFIDBaggage.Presentation
 
         public void ClearStaticBackground()
         {
-            SetRendererTexture(staticBackgroundRenderer, null, ref staticPropertyBlock);
             SetVisible(staticBackgroundRenderer, false);
         }
 
         private void ApplyConfiguredVideoTextures()
         {
             SetRendererTexture(idleVideoRenderer, idleVideoTexture, ref idlePropertyBlock);
-            SetRendererTexture(contentVideoRenderer, contentVideoTexture, ref contentPropertyBlock);
+            SetRendererTexture(contentVideoRenderer, contentVideoTextureA, ref contentPropertyBlock);
         }
 
         private void SetRendererTexture(Renderer targetRenderer, Texture texture, ref MaterialPropertyBlock propertyBlock)
         {
             if (targetRenderer == null)
             {
+                return;
+            }
+
+            if (texture == null)
+            {
+                Debug.LogWarning($"[Transition] Missing texture for renderer {targetRenderer.name}.", this);
                 return;
             }
 

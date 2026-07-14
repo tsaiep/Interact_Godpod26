@@ -108,6 +108,8 @@ namespace RFIDBaggage.Video
             {
                 transitionController.ShowIdleVideo();
                 videoPlaybackManager.PlayIfPlayerPrepared(VideoContentType.Idle);
+                ReleaseStaticBackgroundAfterIdleIsVisible();
+                videoPlaybackManager.StopContent();
                 gameFlowManager.NotifyIdlePrepared();
                 return;
             }
@@ -174,8 +176,9 @@ namespace RFIDBaggage.Video
         {
             if (videoPlaybackManager.PlayPrepared(VideoContentType.Intro))
             {
-                transitionController.ShowContentVideo();
+                transitionController.ShowContentVideo(videoPlaybackManager.GetCurrentContentTexture());
                 videoPlaybackManager.PauseIdle();
+                videoPlaybackManager.StopInactiveContent();
             }
         }
 
@@ -232,17 +235,16 @@ namespace RFIDBaggage.Video
         {
             if (videoPlaybackManager.PlayPrepared(resultType))
             {
-                transitionController.ShowContentVideo();
+                transitionController.ShowContentVideo(videoPlaybackManager.GetCurrentContentTexture());
                 videoPlaybackManager.PauseIdle();
+                videoPlaybackManager.StopInactiveContent();
             }
         }
 
         private void ResetVideoFlow()
         {
             StopCoroutineIfRunning(ref gamePreparingCoroutine);
-            videoPlaybackManager.StopContent();
-            transitionController.ClearStaticBackground();
-            streamingImageLoader.ReleaseCurrentTexture();
+            streamingImageLoader.CancelLoading();
             finalFrameTexture = null;
             finalFrameLoadCompleted = false;
             currentLevel = null;
@@ -256,6 +258,8 @@ namespace RFIDBaggage.Video
             {
                 transitionController.ShowIdleVideo();
                 videoPlaybackManager.PlayPrepared(VideoContentType.Idle);
+                ReleaseStaticBackgroundAfterIdleIsVisible();
+                videoPlaybackManager.StopContent();
                 gameFlowManager.NotifyIdlePrepared();
                 return;
             }
@@ -344,6 +348,14 @@ namespace RFIDBaggage.Video
             }
 
             return false;
+        }
+
+        private void ReleaseStaticBackgroundAfterIdleIsVisible()
+        {
+            transitionController.ClearStaticBackground();
+            streamingImageLoader.ReleaseCurrentTexture();
+            finalFrameTexture = null;
+            finalFrameLoadCompleted = false;
         }
 
         private void StopCoroutineIfRunning(ref Coroutine coroutine)

@@ -5,6 +5,8 @@ namespace RFIDBaggage.Utilities
 {
     public static class StreamingAssetsPathUtility
     {
+        private const string StreamingAssetsFolderName = "StreamingAssets/";
+
         public static bool TryBuildFilePath(string relativePath, out string fullPath)
         {
             fullPath = string.Empty;
@@ -24,13 +26,19 @@ namespace RFIDBaggage.Utilities
                     return false;
                 }
 
-                fullPath = normalizedRelativePath;
-                return true;
+                normalizedRelativePath = normalizedRelativePath.Substring(streamingAssetsRoot.Length).TrimStart('/');
             }
 
-            if (normalizedRelativePath.StartsWith("StreamingAssets/"))
+            int streamingAssetsIndex = normalizedRelativePath.IndexOf(StreamingAssetsFolderName, System.StringComparison.OrdinalIgnoreCase);
+            if (streamingAssetsIndex >= 0)
             {
-                normalizedRelativePath = normalizedRelativePath.Substring("StreamingAssets/".Length);
+                normalizedRelativePath = normalizedRelativePath.Substring(streamingAssetsIndex + StreamingAssetsFolderName.Length);
+            }
+
+            normalizedRelativePath = normalizedRelativePath.TrimStart('/');
+            if (string.IsNullOrWhiteSpace(normalizedRelativePath))
+            {
+                return false;
             }
 
             fullPath = NormalizeSeparators(Path.Combine(Application.streamingAssetsPath, normalizedRelativePath));

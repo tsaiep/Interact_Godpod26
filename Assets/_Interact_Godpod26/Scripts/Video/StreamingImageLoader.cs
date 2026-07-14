@@ -49,6 +49,18 @@ namespace RFIDBaggage.Video
             }
         }
 
+        public void CancelLoading()
+        {
+            if (loadCoroutine != null)
+            {
+                StopCoroutine(loadCoroutine);
+                loadCoroutine = null;
+            }
+
+            IsLoading = false;
+            currentRelativePath = string.Empty;
+        }
+
         private IEnumerator LoadRoutine(string relativePath, Action<Texture2D> onCompleted, Action<string> onFailed)
         {
             IsLoading = true;

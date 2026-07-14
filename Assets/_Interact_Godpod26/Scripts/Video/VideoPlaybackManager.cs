@@ -1,8 +1,10 @@
 using System;
 using System.Collections;
+using System.IO;
 using RFIDBaggage.Utilities;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Serialization;
 using UnityEngine.Video;
 
 namespace RFIDBaggage.Video
@@ -22,8 +24,12 @@ namespace RFIDBaggage.Video
         [SerializeField, Tooltip("VideoPlayer used only for the idle loop.")]
         private VideoPlayer idleVideoPlayer;
 
-        [SerializeField, Tooltip("VideoPlayer used for Intro, Success, and Failure videos.")]
-        private VideoPlayer contentVideoPlayer;
+        [FormerlySerializedAs("contentVideoPlayer")]
+        [SerializeField, Tooltip("First persistent content VideoPlayer. Assign RT_ContentA as Target Texture.")]
+        private VideoPlayer contentVideoPlayerA;
+
+        [SerializeField, Tooltip("Second persistent content VideoPlayer. Assign RT_ContentB as Target Texture.")]
+        private VideoPlayer contentVideoPlayerB;
 
         [Header("Unity Events")]
         [SerializeField] private VideoContentTypeUnityEvent onVideoPrepared = new VideoContentTypeUnityEvent();
@@ -32,20 +38,42 @@ namespace RFIDBaggage.Video
         [SerializeField] private VideoContentTypeUnityEvent onVideoCompleted = new VideoContentTypeUnityEvent();
         [SerializeField] private UnityEvent onVideoError = new UnityEvent();
 
+        private sealed class PlayerState
+        {
+            public PlayerState(VideoPlayer player, bool isContent)
+            {
+                Player = player;
+                IsContent = isContent;
+            }
+
+            public VideoPlayer Player;
+            public bool IsContent;
+            public int Token;
+            public bool IsPreparing;
+            public bool IsPlaying;
+            public bool FirstFrameReceived;
+            public bool CompletionReported;
+            public bool Loop;
+            public VideoContentType ContentType = VideoContentType.None;
+            public string RelativePath = string.Empty;
+            public string FullPath = string.Empty;
+            public string Url = string.Empty;
+            public Coroutine PrepareTimeoutCoroutine;
+            public Coroutine FirstFrameCoroutine;
+        }
+
         private int operationToken;
-        private int preparingToken;
-        private int playingToken;
-        private bool hasReportedCompletion;
-        private bool firstFrameReceived;
-        private VideoContentType preparingContentType = VideoContentType.None;
-        private VideoContentType currentContentType = VideoContentType.None;
-        private Coroutine prepareTimeoutCoroutine;
-        private Coroutine firstFrameCoroutine;
+        private PlayerState idleState;
+        private PlayerState contentAState;
+        private PlayerState contentBState;
+        private PlayerState preparedState;
+        private PlayerState activeContentState;
+        private PlayerState standbyContentState;
 
         public bool IsPreparing { get; private set; }
         public bool IsPlaying { get; private set; }
-        public VideoContentType CurrentContentType => currentContentType;
-        public VideoContentType PreparingContentType => preparingContentType;
+        public VideoContentType CurrentContentType { get; private set; } = VideoContentType.None;
+        public VideoContentType PreparingContentType { get; private set; } = VideoContentType.None;
         public VideoContentType PreparedContentType { get; private set; } = VideoContentType.None;
 
         public event Action<VideoContentType> VideoPrepared;
@@ -54,16 +82,21 @@ namespace RFIDBaggage.Video
         public event Action<VideoContentType> VideoCompleted;
         public event Action<VideoContentType, string> VideoFailed;
 
+        private void Awake()
+        {
+            InitializeStates();
+        }
+
         private void OnEnable()
         {
-            Subscribe(idleVideoPlayer);
-            Subscribe(contentVideoPlayer);
+            InitializeStates();
+            SubscribeAll();
         }
 
         private void OnDisable()
         {
-            Unsubscribe(idleVideoPlayer);
-            Unsubscribe(contentVideoPlayer);
+            UnsubscribeAll();
+            StopAllCoroutinesForStates();
         }
 
         public void PrepareIdle(string relativePath)
@@ -88,121 +121,100 @@ namespace RFIDBaggage.Video
 
         public void Prepare(VideoContentType contentType, string relativePath, bool loop)
         {
-            VideoPlayer player = GetPlayer(contentType);
-            if (player == null)
+            InitializeStates();
+
+            PlayerState state = GetPrepareState(contentType);
+            if (state == null || state.Player == null)
             {
-                ReportFailure(contentType, $"Missing VideoPlayer for {contentType}.");
+                ReportFailure(contentType, $"Missing VideoPlayer for {contentType}. Content videos require ContentVideoPlayerA and ContentVideoPlayerB.");
                 return;
             }
 
             if (!StreamingAssetsPathUtility.TryBuildFilePath(relativePath, out string fullPath) ||
                 !StreamingAssetsPathUtility.TryBuildFileUri(relativePath, out string fileUri))
             {
-                ReportFailure(contentType, $"Invalid StreamingAssets path: {relativePath}");
+                ReportFailure(contentType, $"Invalid StreamingAssets path.\nRelative Path: {relativePath}");
                 return;
             }
 
-            if (!System.IO.File.Exists(fullPath))
+            if (!File.Exists(fullPath))
             {
-                ReportFailure(contentType, $"File not found:\n{fullPath}");
+                ReportFailure(contentType, BuildDiagnosticMessage("File not found.", relativePath, fullPath, fileUri));
                 return;
             }
 
             operationToken++;
-            preparingToken = operationToken;
-            preparingContentType = contentType;
+            ResetPreparingState(state, operationToken, contentType, relativePath, fullPath, fileUri, loop);
             PreparedContentType = VideoContentType.None;
+            preparedState = null;
+            PreparingContentType = contentType;
             IsPreparing = true;
-            firstFrameReceived = false;
-            hasReportedCompletion = false;
 
-            StopCoroutineIfRunning(ref prepareTimeoutCoroutine);
-            StopCoroutineIfRunning(ref firstFrameCoroutine);
-
-            ConfigurePlayer(player, loop);
-            player.Stop();
-            player.url = fileUri;
+            ConfigurePlayer(state.Player, loop);
+            state.Player.Stop();
+            state.Player.url = fileUri;
 
             if (ShouldLog)
             {
-                Debug.Log($"[Video] Preparing {contentType}:\n{fullPath}", this);
+                Debug.Log(BuildDiagnosticMessage($"Preparing {contentType}.", relativePath, fullPath, fileUri), this);
             }
 
-            player.Prepare();
-            prepareTimeoutCoroutine = StartCoroutine(PrepareTimeoutRoutine(preparingToken, contentType, relativePath));
+            state.Player.Prepare();
+            state.PrepareTimeoutCoroutine = StartCoroutine(PrepareTimeoutRoutine(state, state.Token));
         }
 
         public bool PlayPrepared(VideoContentType expectedContentType)
         {
-            if (PreparedContentType != expectedContentType)
+            if (PreparedContentType != expectedContentType || preparedState == null)
             {
                 Debug.LogWarning($"[Video] Cannot play {expectedContentType}. Prepared content is {PreparedContentType}.", this);
                 return false;
             }
 
-            VideoPlayer player = GetPlayer(expectedContentType);
-            if (player == null || !player.isPrepared)
-            {
-                Debug.LogWarning($"[Video] Cannot play {expectedContentType}. VideoPlayer is not prepared.", this);
-                return false;
-            }
-
-            operationToken++;
-            playingToken = operationToken;
-            currentContentType = expectedContentType;
-            IsPlaying = true;
-            hasReportedCompletion = false;
-
-            player.Play();
-
-            if (ShouldLog)
-            {
-                Debug.Log($"[Video] {expectedContentType} started.", this);
-            }
-
-            VideoStarted?.Invoke(expectedContentType);
-            onVideoStarted.Invoke(expectedContentType);
-            return true;
+            return PlayState(preparedState, expectedContentType);
         }
 
         public bool PlayIfPlayerPrepared(VideoContentType contentType)
         {
-            VideoPlayer player = GetPlayer(contentType);
-            if (player == null || !player.isPrepared)
-            {
-                return false;
-            }
-
-            operationToken++;
-            currentContentType = contentType;
-            IsPlaying = true;
-            hasReportedCompletion = false;
-            player.Play();
-
-            if (ShouldLog)
-            {
-                Debug.Log($"[Video] {contentType} started.", this);
-            }
-
-            VideoStarted?.Invoke(contentType);
-            onVideoStarted.Invoke(contentType);
-            return true;
+            PlayerState state = GetPreparedState(contentType);
+            return state != null && PlayState(state, contentType);
         }
 
         public bool IsPlayerPrepared(VideoContentType contentType)
         {
-            VideoPlayer player = GetPlayer(contentType);
-            return player != null && player.isPrepared;
+            PlayerState state = GetPreparedState(contentType);
+            return state != null && state.Player != null && state.Player.isPrepared;
+        }
+
+        public Texture GetPreparedTexture(VideoContentType contentType)
+        {
+            PlayerState state = PreparedContentType == contentType ? preparedState : GetPreparedState(contentType);
+            return GetTargetTexture(state);
+        }
+
+        public Texture GetCurrentContentTexture()
+        {
+            return GetTargetTexture(activeContentState);
+        }
+
+        public void StopInactiveContent()
+        {
+            StopContentStateIfInactive(contentAState);
+            StopContentStateIfInactive(contentBState);
         }
 
         public void StopContent()
         {
-            StopPlayer(contentVideoPlayer);
+            PlayerState nextStandbyState = GetOtherContentState(activeContentState);
+            StopPlayer(contentAState);
+            StopPlayer(contentBState);
+            activeContentState = null;
+            standbyContentState = nextStandbyState != null ? nextStandbyState : contentAState != null ? contentAState : contentBState;
 
-            if (currentContentType != VideoContentType.Idle)
+            if (CurrentContentType != VideoContentType.Idle)
             {
                 IsPlaying = false;
-                currentContentType = VideoContentType.None;
+                CurrentContentType = VideoContentType.None;
             }
         }
 
@@ -218,27 +230,173 @@ namespace RFIDBaggage.Video
 
         public void StopIdle()
         {
-            StopPlayer(idleVideoPlayer);
+            StopPlayer(idleState);
 
-            if (currentContentType == VideoContentType.Idle)
+            if (CurrentContentType == VideoContentType.Idle)
             {
                 IsPlaying = false;
-                currentContentType = VideoContentType.None;
+                CurrentContentType = VideoContentType.None;
             }
         }
 
         public void StopAll()
         {
             operationToken++;
-            StopCoroutineIfRunning(ref prepareTimeoutCoroutine);
-            StopCoroutineIfRunning(ref firstFrameCoroutine);
-            StopPlayer(idleVideoPlayer);
-            StopPlayer(contentVideoPlayer);
+            StopAllCoroutinesForStates();
+            StopPlayer(idleState);
+            StopPlayer(contentAState);
+            StopPlayer(contentBState);
             IsPreparing = false;
             IsPlaying = false;
-            preparingContentType = VideoContentType.None;
-            currentContentType = VideoContentType.None;
+            PreparingContentType = VideoContentType.None;
+            CurrentContentType = VideoContentType.None;
             PreparedContentType = VideoContentType.None;
+            preparedState = null;
+            activeContentState = null;
+            standbyContentState = contentAState != null ? contentAState : contentBState;
+        }
+
+        private bool PlayState(PlayerState state, VideoContentType contentType)
+        {
+            if (state.Player == null || !state.Player.isPrepared)
+            {
+                Debug.LogWarning($"[Video] Cannot play {contentType}. VideoPlayer is not prepared.", this);
+                return false;
+            }
+
+            operationToken++;
+            state.IsPlaying = true;
+            state.CompletionReported = false;
+            state.ContentType = contentType;
+            CurrentContentType = contentType;
+            IsPlaying = true;
+
+            if (state.IsContent)
+            {
+                activeContentState = state;
+                standbyContentState = GetOtherContentState(state);
+            }
+
+            state.Player.Play();
+
+            if (ShouldLog)
+            {
+                Debug.Log($"[Video] {contentType} started on {state.Player.name}.", this);
+            }
+
+            VideoStarted?.Invoke(contentType);
+            onVideoStarted.Invoke(contentType);
+            return true;
+        }
+
+        private void InitializeStates()
+        {
+            idleState = UpdateState(idleState, idleVideoPlayer, false);
+            contentAState = UpdateState(contentAState, contentVideoPlayerA, true);
+            contentBState = UpdateState(contentBState, contentVideoPlayerB, true);
+
+            if (activeContentState != contentAState && activeContentState != contentBState)
+            {
+                activeContentState = null;
+            }
+
+            if (standbyContentState != contentAState && standbyContentState != contentBState)
+            {
+                standbyContentState = contentAState;
+            }
+
+            if (standbyContentState == null && contentBState != null)
+            {
+                standbyContentState = contentBState;
+            }
+        }
+
+        private static PlayerState UpdateState(PlayerState state, VideoPlayer player, bool isContent)
+        {
+            if (player == null)
+            {
+                return null;
+            }
+
+            if (state == null)
+            {
+                return new PlayerState(player, isContent);
+            }
+
+            state.Player = player;
+            state.IsContent = isContent;
+            return state;
+        }
+
+        private PlayerState GetPrepareState(VideoContentType contentType)
+        {
+            if (contentType == VideoContentType.Idle)
+            {
+                return idleState;
+            }
+
+            if (contentAState == null || contentBState == null)
+            {
+                return null;
+            }
+
+            if (standbyContentState == null || standbyContentState == activeContentState)
+            {
+                standbyContentState = GetOtherContentState(activeContentState);
+            }
+
+            return standbyContentState;
+        }
+
+        private PlayerState GetPreparedState(VideoContentType contentType)
+        {
+            if (contentType == VideoContentType.Idle)
+            {
+                return idleState != null && idleState.Player != null && idleState.Player.isPrepared ? idleState : null;
+            }
+
+            if (preparedState != null && preparedState.ContentType == contentType && preparedState.Player != null && preparedState.Player.isPrepared)
+            {
+                return preparedState;
+            }
+
+            if (activeContentState != null && activeContentState.ContentType == contentType && activeContentState.Player != null && activeContentState.Player.isPrepared)
+            {
+                return activeContentState;
+            }
+
+            return null;
+        }
+
+        private PlayerState GetOtherContentState(PlayerState state)
+        {
+            if (state == contentAState)
+            {
+                return contentBState;
+            }
+
+            if (state == contentBState)
+            {
+                return contentAState;
+            }
+
+            return contentAState != null ? contentAState : contentBState;
+        }
+
+        private void ResetPreparingState(PlayerState state, int token, VideoContentType contentType, string relativePath, string fullPath, string url, bool loop)
+        {
+            StopCoroutineIfRunning(ref state.PrepareTimeoutCoroutine);
+            StopCoroutineIfRunning(ref state.FirstFrameCoroutine);
+            state.Token = token;
+            state.IsPreparing = true;
+            state.IsPlaying = false;
+            state.FirstFrameReceived = false;
+            state.CompletionReported = false;
+            state.ContentType = contentType;
+            state.RelativePath = relativePath;
+            state.FullPath = fullPath;
+            state.Url = url;
+            state.Loop = loop;
         }
 
         private void ConfigurePlayer(VideoPlayer player, bool loop)
@@ -250,9 +408,32 @@ namespace RFIDBaggage.Video
             player.sendFrameReadyEvents = true;
         }
 
-        private VideoPlayer GetPlayer(VideoContentType contentType)
+        private void SubscribeAll()
         {
-            return contentType == VideoContentType.Idle ? idleVideoPlayer : contentVideoPlayer;
+            Subscribe(idleVideoPlayer);
+            if (contentVideoPlayerA != idleVideoPlayer)
+            {
+                Subscribe(contentVideoPlayerA);
+            }
+
+            if (contentVideoPlayerB != idleVideoPlayer && contentVideoPlayerB != contentVideoPlayerA)
+            {
+                Subscribe(contentVideoPlayerB);
+            }
+        }
+
+        private void UnsubscribeAll()
+        {
+            Unsubscribe(idleVideoPlayer);
+            if (contentVideoPlayerA != idleVideoPlayer)
+            {
+                Unsubscribe(contentVideoPlayerA);
+            }
+
+            if (contentVideoPlayerB != idleVideoPlayer && contentVideoPlayerB != contentVideoPlayerA)
+            {
+                Unsubscribe(contentVideoPlayerB);
+            }
         }
 
         private void Subscribe(VideoPlayer player)
@@ -261,6 +442,11 @@ namespace RFIDBaggage.Video
             {
                 return;
             }
+
+            player.prepareCompleted -= HandlePrepareCompleted;
+            player.loopPointReached -= HandleLoopPointReached;
+            player.errorReceived -= HandleErrorReceived;
+            player.frameReady -= HandleFrameReady;
 
             player.prepareCompleted += HandlePrepareCompleted;
             player.loopPointReached += HandleLoopPointReached;
@@ -283,118 +469,146 @@ namespace RFIDBaggage.Video
 
         private void HandlePrepareCompleted(VideoPlayer player)
         {
-            int callbackToken = preparingToken;
-            VideoContentType contentType = preparingContentType;
-
-            if (!IsPreparing || callbackToken != operationToken)
+            PlayerState state = GetState(player);
+            if (state == null || !state.IsPreparing || state.Token != operationToken)
             {
-                Debug.Log($"[Video] Ignored stale callback. Token: {callbackToken}", this);
+                LogStaleCallback(state);
                 return;
             }
 
-            StopCoroutineIfRunning(ref prepareTimeoutCoroutine);
+            StopCoroutineIfRunning(ref state.PrepareTimeoutCoroutine);
 
             if (ShouldLog)
             {
-                Debug.Log($"[Video] {contentType} prepared.", this);
+                Debug.Log($"[Video] {state.ContentType} prepared on {player.name}.", this);
             }
 
-            VideoPrepared?.Invoke(contentType);
-            onVideoPrepared.Invoke(contentType);
-            firstFrameCoroutine = StartCoroutine(FirstFrameRoutine(callbackToken, contentType, player));
+            VideoPrepared?.Invoke(state.ContentType);
+            onVideoPrepared.Invoke(state.ContentType);
+            state.FirstFrameCoroutine = StartCoroutine(FirstFrameRoutine(state, state.Token));
         }
 
-        private IEnumerator FirstFrameRoutine(int token, VideoContentType contentType, VideoPlayer player)
+        private IEnumerator FirstFrameRoutine(PlayerState state, int token)
         {
-            float timeout = videoSystemConfig != null ? videoSystemConfig.FirstFrameTimeout : 3f;
+            float timeout = videoSystemConfig != null ? videoSystemConfig.FirstFrameTimeout : 5f;
             float start = Time.unscaledTime;
+            VideoPlayer player = state.Player;
 
-            if (player.canStep)
+            if (player != null && player.canStep)
             {
                 player.StepForward();
             }
 
-            while (token == operationToken && !firstFrameReceived && Time.unscaledTime - start < timeout)
+            if (player != null && !player.isPlaying)
             {
-                if (player.texture != null && player.texture.width > 0 && player.texture.height > 0)
+                player.Play();
+            }
+
+            while (state.Token == token && state.IsPreparing && !state.FirstFrameReceived && Time.unscaledTime - start < timeout)
+            {
+                if (player != null && player.frame >= 0 && player.texture != null && player.texture.width > 0 && player.texture.height > 0)
                 {
-                    firstFrameReceived = true;
+                    state.FirstFrameReceived = true;
                     break;
                 }
 
                 yield return null;
             }
 
-            if (token != operationToken)
+            state.FirstFrameCoroutine = null;
+
+            if (state.Token != token || !state.IsPreparing)
             {
-                Debug.Log($"[Video] Ignored stale callback. Token: {token}", this);
+                LogStaleCallback(state);
                 yield break;
             }
 
-            if (!firstFrameReceived)
+            if (!state.FirstFrameReceived)
             {
-                ReportFailure(contentType, $"First frame timeout: {contentType}");
+                ReportFailure(state.ContentType, BuildDiagnosticMessage($"First frame timeout after {timeout:0.##} seconds.", state));
                 yield break;
             }
 
+            if (player != null && player.isPlaying)
+            {
+                player.Pause();
+            }
+
+            state.IsPreparing = false;
+            state.Player.sendFrameReadyEvents = false;
             IsPreparing = false;
-            PreparedContentType = contentType;
+            PreparingContentType = VideoContentType.None;
+            PreparedContentType = state.ContentType;
+            preparedState = state;
 
             if (ShouldLog)
             {
-                Debug.Log($"[Video] {contentType} first frame ready.", this);
+                Debug.Log($"[Video] {state.ContentType} first frame ready on {player.name}.", this);
             }
 
-            FirstFrameReady?.Invoke(contentType);
-            onFirstFrameReady.Invoke(contentType);
+            FirstFrameReady?.Invoke(state.ContentType);
+            onFirstFrameReady.Invoke(state.ContentType);
         }
 
         private void HandleFrameReady(VideoPlayer player, long frameIdx)
         {
-            firstFrameReceived = true;
-        }
-
-        private void HandleLoopPointReached(VideoPlayer player)
-        {
-            VideoContentType completedType = GetCompletedContentType(player);
-
-            if (completedType == VideoContentType.Idle || completedType == VideoContentType.None || hasReportedCompletion)
+            PlayerState state = GetState(player);
+            if (state == null || !state.IsPreparing || state.Token != operationToken)
             {
                 return;
             }
 
-            hasReportedCompletion = true;
+            state.FirstFrameReceived = true;
+            player.sendFrameReadyEvents = false;
+        }
+
+        private void HandleLoopPointReached(VideoPlayer player)
+        {
+            PlayerState state = GetState(player);
+            if (state == null || state.ContentType == VideoContentType.Idle || state.Loop || !state.IsPlaying || state.CompletionReported)
+            {
+                return;
+            }
+
+            state.CompletionReported = true;
+            state.IsPlaying = false;
             IsPlaying = false;
+            CurrentContentType = VideoContentType.None;
 
             if (ShouldLog)
             {
-                Debug.Log($"[Video] {completedType} completed.", this);
+                Debug.Log($"[Video] {state.ContentType} completed on {player.name}.", this);
             }
 
-            VideoCompleted?.Invoke(completedType);
-            onVideoCompleted.Invoke(completedType);
+            VideoCompleted?.Invoke(state.ContentType);
+            onVideoCompleted.Invoke(state.ContentType);
         }
 
         private void HandleErrorReceived(VideoPlayer player, string message)
         {
-            VideoContentType failedType = player == idleVideoPlayer
-                ? VideoContentType.Idle
-                : preparingContentType != VideoContentType.None ? preparingContentType : currentContentType;
+            PlayerState state = GetState(player);
+            VideoContentType failedType = state != null && state.ContentType != VideoContentType.None
+                ? state.ContentType
+                : PreparingContentType != VideoContentType.None ? PreparingContentType : CurrentContentType;
 
-            ReportFailure(failedType, message);
+            string details = state != null
+                ? BuildDiagnosticMessage($"VideoPlayer error: {message}", state)
+                : $"VideoPlayer error: {message}";
+
+            ReportFailure(failedType, details);
         }
 
-        private IEnumerator PrepareTimeoutRoutine(int token, VideoContentType contentType, string relativePath)
+        private IEnumerator PrepareTimeoutRoutine(PlayerState state, int token)
         {
             float timeout = videoSystemConfig != null ? videoSystemConfig.PrepareTimeout : 10f;
             yield return new WaitForSecondsRealtime(timeout);
 
-            if (token != operationToken || !IsPreparing)
+            if (state.Token != token || !state.IsPreparing)
             {
                 yield break;
             }
 
-            ReportFailure(contentType, $"Prepare timeout:\n{relativePath}");
+            ReportFailure(state.ContentType, BuildDiagnosticMessage($"Prepare timeout after {timeout:0.##} seconds.", state));
         }
 
         private void ReportFailure(VideoContentType contentType, string message)
@@ -402,43 +616,111 @@ namespace RFIDBaggage.Video
             operationToken++;
             IsPreparing = false;
             IsPlaying = false;
-            StopCoroutineIfRunning(ref prepareTimeoutCoroutine);
-            StopCoroutineIfRunning(ref firstFrameCoroutine);
+            PreparingContentType = VideoContentType.None;
+            PreparedContentType = VideoContentType.None;
+            preparedState = null;
+            StopAllCoroutinesForStates();
+            StopPreparingPlayers();
+
             Debug.LogWarning($"[Video] {message}", this);
             VideoFailed?.Invoke(contentType, message);
             onVideoError.Invoke();
         }
 
-        private void StopPlayer(VideoPlayer player)
+        private void StopPreparingPlayers()
         {
-            if (player == null)
+            StopIfPreparing(idleState);
+            StopIfPreparing(contentAState);
+            StopIfPreparing(contentBState);
+        }
+
+        private void StopIfPreparing(PlayerState state)
+        {
+            if (state == null || !state.IsPreparing)
             {
                 return;
             }
 
-            player.Stop();
+            StopPlayer(state);
         }
 
-        private VideoContentType GetCompletedContentType(VideoPlayer player)
+        private void StopPlayer(PlayerState state)
         {
-            if (player == idleVideoPlayer)
+            if (state == null || state.Player == null)
             {
-                return VideoContentType.Idle;
+                return;
             }
 
-            if (player != contentVideoPlayer)
+            state.Player.sendFrameReadyEvents = false;
+            state.Player.Stop();
+            state.IsPreparing = false;
+            state.IsPlaying = false;
+            state.FirstFrameReceived = false;
+            state.CompletionReported = false;
+            state.ContentType = VideoContentType.None;
+        }
+
+        private void StopContentStateIfInactive(PlayerState state)
+        {
+            if (state == null || state == activeContentState)
             {
-                return VideoContentType.None;
+                return;
             }
 
-            if (currentContentType == VideoContentType.Intro ||
-                currentContentType == VideoContentType.Success ||
-                currentContentType == VideoContentType.Failure)
+            StopPlayer(state);
+        }
+
+        private PlayerState GetState(VideoPlayer player)
+        {
+            if (player == null)
             {
-                return currentContentType;
+                return null;
             }
 
-            return VideoContentType.None;
+            if (idleState != null && player == idleState.Player)
+            {
+                return idleState;
+            }
+
+            if (contentAState != null && player == contentAState.Player)
+            {
+                return contentAState;
+            }
+
+            if (contentBState != null && player == contentBState.Player)
+            {
+                return contentBState;
+            }
+
+            return null;
+        }
+
+        private static Texture GetTargetTexture(PlayerState state)
+        {
+            if (state == null || state.Player == null)
+            {
+                return null;
+            }
+
+            return state.Player.targetTexture != null ? state.Player.targetTexture : state.Player.texture;
+        }
+
+        private void StopAllCoroutinesForStates()
+        {
+            StopCoroutinesForState(idleState);
+            StopCoroutinesForState(contentAState);
+            StopCoroutinesForState(contentBState);
+        }
+
+        private void StopCoroutinesForState(PlayerState state)
+        {
+            if (state == null)
+            {
+                return;
+            }
+
+            StopCoroutineIfRunning(ref state.PrepareTimeoutCoroutine);
+            StopCoroutineIfRunning(ref state.FirstFrameCoroutine);
         }
 
         private void StopCoroutineIfRunning(ref Coroutine coroutine)
@@ -450,6 +732,28 @@ namespace RFIDBaggage.Video
 
             StopCoroutine(coroutine);
             coroutine = null;
+        }
+
+        private string BuildDiagnosticMessage(string reason, PlayerState state)
+        {
+            return BuildDiagnosticMessage(reason, state.RelativePath, state.FullPath, state.Url);
+        }
+
+        private static string BuildDiagnosticMessage(string reason, string relativePath, string fullPath, string url)
+        {
+            return $"{reason}\nRelative Path: {relativePath}\nFull Path: {fullPath}\nURL: {url}";
+        }
+
+        private void LogStaleCallback(PlayerState state)
+        {
+            if (!ShouldLog)
+            {
+                return;
+            }
+
+            string playerName = state != null && state.Player != null ? state.Player.name : "<unknown>";
+            int token = state != null ? state.Token : -1;
+            Debug.Log($"[Video] Ignored stale callback from {playerName}. Token: {token}, Current: {operationToken}", this);
         }
 
         private bool ShouldLog => videoSystemConfig == null || videoSystemConfig.VerboseVideoLogs;

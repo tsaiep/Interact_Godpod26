@@ -14,6 +14,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RFIDBaggage.Video.VideoSystemConfig
   idleVideoRelativePath: Videos/Common/Idle_Loop.mp4
   prepareTimeout: 10
-  firstFrameTimeout: 3
+  firstFrameTimeout: 5
   imageLoadTimeout: 10
   verboseVideoLogs: 1

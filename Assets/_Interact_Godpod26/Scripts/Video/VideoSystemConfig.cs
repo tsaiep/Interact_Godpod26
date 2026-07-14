@@ -15,7 +15,7 @@ namespace RFIDBaggage.Video
         private float prepareTimeout = 10f;
 
         [SerializeField, Min(0.1f), Tooltip("Maximum seconds to wait for a visible first frame after Prepare.")]
-        private float firstFrameTimeout = 3f;
+        private float firstFrameTimeout = 5f;
 
         [SerializeField, Min(0.1f), Tooltip("Maximum seconds to wait for final-frame image loading.")]
         private float imageLoadTimeout = 10f;
