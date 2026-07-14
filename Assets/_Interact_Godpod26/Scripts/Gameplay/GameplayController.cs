@@ -292,6 +292,7 @@ namespace RFIDBaggage.Gameplay
 
             if (selectionController != null)
             {
+                selectionController.SelectInitialItem();
                 selectionController.EnableInput();
             }
 

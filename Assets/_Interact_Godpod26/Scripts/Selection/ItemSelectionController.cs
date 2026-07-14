@@ -27,6 +27,7 @@ namespace RFIDBaggage.Selection
         private float confirmCooldown;
         private float nextNavigationTime;
         private float nextConfirmTime;
+        private SelectableItem pendingDefaultSelection;
 
         public SelectableItem CurrentSelection { get; private set; }
         public bool InputEnabled { get; private set; }
@@ -91,10 +92,7 @@ namespace RFIDBaggage.Selection
                 defaultItem = FindFirstValidItem();
             }
 
-            if (defaultItem != null)
-            {
-                SetCurrentSelection(defaultItem);
-            }
+            pendingDefaultSelection = defaultItem;
         }
 
         public void EnableInput()
@@ -107,6 +105,20 @@ namespace RFIDBaggage.Selection
         public void DisableInput()
         {
             InputEnabled = false;
+        }
+
+        public void SelectInitialItem()
+        {
+            if (CurrentSelection != null)
+            {
+                return;
+            }
+
+            SelectableItem initialItem = IsValidCandidate(pendingDefaultSelection)
+                ? pendingDefaultSelection
+                : FindFirstValidItem();
+
+            SetCurrentSelection(initialItem);
         }
 
         public void MoveSelection(Vector2 direction)
@@ -190,6 +202,7 @@ namespace RFIDBaggage.Selection
             DisableInput();
             ClearSelection();
             items.Clear();
+            pendingDefaultSelection = null;
             nextNavigationTime = 0f;
             nextConfirmTime = 0f;
         }

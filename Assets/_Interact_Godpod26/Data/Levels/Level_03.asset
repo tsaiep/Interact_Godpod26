@@ -19,6 +19,8 @@ MonoBehaviour:
   successVideoRelativePath: Videos/Level03/Level03_Success.mp4
   failureVideoRelativePath: Videos/Level03/Level03_Failure.mp4
   finalFrameImageRelativePath: Images/Level03/Level03_FinalFrame.png
+  successPerformanceLeadTime: 1
+  failurePerformanceLeadTime: 1
   levelRoot: {fileID: 0}
   gameplayDuration: 15
   gameplayStartDelay: 3

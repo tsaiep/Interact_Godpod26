@@ -197,6 +197,33 @@ namespace RFIDBaggage.Video
             return GetTargetTexture(activeContentState);
         }
 
+        public bool TryGetPlaybackTiming(VideoContentType contentType, out double time, out double length, out double remaining)
+        {
+            time = 0d;
+            length = 0d;
+            remaining = 0d;
+
+            PlayerState state = GetPreparedState(contentType);
+            if (state == null || state.Player == null || !state.IsPlaying)
+            {
+                return false;
+            }
+
+            time = state.Player.time;
+            length = state.Player.length;
+
+            if (double.IsNaN(time) || double.IsInfinity(time) ||
+                double.IsNaN(length) || double.IsInfinity(length) ||
+                length <= 0d)
+            {
+                return false;
+            }
+
+            time = Math.Max(0d, time);
+            remaining = Math.Max(0d, length - time);
+            return true;
+        }
+
         public void StopInactiveContent()
         {
             StopContentStateIfInactive(contentAState);

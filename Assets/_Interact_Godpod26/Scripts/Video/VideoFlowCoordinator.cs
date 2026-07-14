@@ -4,6 +4,7 @@ using RFIDBaggage.Levels;
 using RFIDBaggage.Presentation;
 using RFIDBaggage.Utilities;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace RFIDBaggage.Video
 {
@@ -25,10 +26,18 @@ namespace RFIDBaggage.Video
         [SerializeField, Tooltip("Display layer switcher.")]
         private VideoTransitionController transitionController;
 
+        [Header("Result Performance Cues")]
+        [SerializeField, Tooltip("Invoked once when the success video reaches its configured lead time before ending.")]
+        private UnityEvent onSuccessPerformanceCue = new UnityEvent();
+
+        [SerializeField, Tooltip("Invoked once when the failure video reaches its configured lead time before ending.")]
+        private UnityEvent onFailurePerformanceCue = new UnityEvent();
+
         private LevelConfig currentLevel;
         private Texture2D finalFrameTexture;
         private bool finalFrameLoadCompleted;
         private Coroutine gamePreparingCoroutine;
+        private Coroutine resultPerformanceCueCoroutine;
 
         private void OnEnable()
         {
@@ -58,6 +67,8 @@ namespace RFIDBaggage.Video
                 videoPlaybackManager.VideoCompleted -= HandleVideoCompleted;
                 videoPlaybackManager.VideoFailed -= HandleVideoFailed;
             }
+
+            StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
         }
 
         private void HandleStateChanged(GameState previousState, GameState nextState)
@@ -228,12 +239,14 @@ namespace RFIDBaggage.Video
                 transitionController.ShowContentVideo(videoPlaybackManager.GetCurrentContentTexture());
                 videoPlaybackManager.PauseIdle();
                 videoPlaybackManager.StopInactiveContent();
+                StartResultPerformanceCue(resultType);
             }
         }
 
         private void ResetVideoFlow()
         {
             StopCoroutineIfRunning(ref gamePreparingCoroutine);
+            StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
             streamingImageLoader.CancelLoading();
             finalFrameTexture = null;
             finalFrameLoadCompleted = false;
@@ -280,13 +293,76 @@ namespace RFIDBaggage.Video
             if ((contentType == VideoContentType.Success && state == GameState.SuccessPlaying) ||
                 (contentType == VideoContentType.Failure && state == GameState.FailurePlaying))
             {
+                StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
                 gameFlowManager.NotifyResultCompleted();
             }
         }
 
         private void HandleVideoFailed(VideoContentType contentType, string message)
         {
+            StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
             gameFlowManager.ReportRecoverableError($"Video {contentType} failed. {message}");
+        }
+
+        private void StartResultPerformanceCue(VideoContentType resultType)
+        {
+            StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
+
+            if (currentLevel == null)
+            {
+                return;
+            }
+
+            float leadTime = resultType == VideoContentType.Success
+                ? currentLevel.SuccessPerformanceLeadTime
+                : resultType == VideoContentType.Failure
+                    ? currentLevel.FailurePerformanceLeadTime
+                    : 0f;
+
+            if (leadTime <= 0f)
+            {
+                return;
+            }
+
+            resultPerformanceCueCoroutine = StartCoroutine(ResultPerformanceCueRoutine(resultType, leadTime));
+        }
+
+        private IEnumerator ResultPerformanceCueRoutine(VideoContentType resultType, float leadTime)
+        {
+            while (IsExpectedResultPlaying(resultType))
+            {
+                if (videoPlaybackManager.TryGetPlaybackTiming(resultType, out double time, out double length, out double remaining) &&
+                    remaining <= leadTime)
+                {
+                    Debug.Log($"[VideoFlow] {resultType} performance cue fired. Time: {time:0.###}/{length:0.###}, remaining: {remaining:0.###}.", this);
+                    InvokeResultPerformanceCue(resultType);
+                    break;
+                }
+
+                yield return null;
+            }
+
+            resultPerformanceCueCoroutine = null;
+        }
+
+        private bool IsExpectedResultPlaying(VideoContentType resultType)
+        {
+            return (resultType == VideoContentType.Success && gameFlowManager.CurrentState == GameState.SuccessPlaying) ||
+                   (resultType == VideoContentType.Failure && gameFlowManager.CurrentState == GameState.FailurePlaying);
+        }
+
+        private void InvokeResultPerformanceCue(VideoContentType resultType)
+        {
+            if (resultType == VideoContentType.Success)
+            {
+                onSuccessPerformanceCue.Invoke();
+                return;
+            }
+
+            if (resultType == VideoContentType.Failure)
+            {
+                onFailurePerformanceCue.Invoke();
+            }
         }
 
         private bool ValidateLevelMedia(LevelConfig level)

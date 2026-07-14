@@ -31,6 +31,13 @@ namespace RFIDBaggage.Levels
         [SerializeField, Tooltip("Final-frame image path relative to StreamingAssets.")]
         private string finalFrameImageRelativePath;
 
+        [Header("Result Performance Cues")]
+        [SerializeField, Min(0f), Tooltip("Seconds before the success video ends to fire the success performance event. Set 0 to disable.")]
+        private float successPerformanceLeadTime;
+
+        [SerializeField, Min(0f), Tooltip("Seconds before the failure video ends to fire the failure performance event. Set 0 to disable.")]
+        private float failurePerformanceLeadTime;
+
         [Header("Scene References")]
         [SerializeField, Tooltip("Optional level root. Prefer GameplayController Level Views for scene object references.")]
         private GameObject levelRoot;
@@ -67,6 +74,8 @@ namespace RFIDBaggage.Levels
         public string SuccessVideoRelativePath => successVideoRelativePath;
         public string FailureVideoRelativePath => failureVideoRelativePath;
         public string FinalFrameImageRelativePath => finalFrameImageRelativePath;
+        public float SuccessPerformanceLeadTime => successPerformanceLeadTime;
+        public float FailurePerformanceLeadTime => failurePerformanceLeadTime;
         public GameObject LevelRoot => levelRoot;
         public float GameplayDuration => gameplayDuration;
         public float GameplayStartDelay => gameplayStartDelay;
@@ -94,6 +103,18 @@ namespace RFIDBaggage.Levels
             if (gameplayDuration <= 0f)
             {
                 message = $"{name} has an invalid gameplay duration.";
+                return false;
+            }
+
+            if (successPerformanceLeadTime < 0f)
+            {
+                message = $"{name} has an invalid success performance lead time.";
+                return false;
+            }
+
+            if (failurePerformanceLeadTime < 0f)
+            {
+                message = $"{name} has an invalid failure performance lead time.";
                 return false;
             }
 
@@ -154,6 +175,8 @@ namespace RFIDBaggage.Levels
             }
 
             inputCooldown = Mathf.Max(0f, inputCooldown);
+            successPerformanceLeadTime = Mathf.Max(0f, successPerformanceLeadTime);
+            failurePerformanceLeadTime = Mathf.Max(0f, failurePerformanceLeadTime);
             gameplayStartDelay = Mathf.Max(0f, gameplayStartDelay);
             warningStartTime = Mathf.Max(0f, warningStartTime);
             selectionInputCooldown = Mathf.Max(0f, selectionInputCooldown);
