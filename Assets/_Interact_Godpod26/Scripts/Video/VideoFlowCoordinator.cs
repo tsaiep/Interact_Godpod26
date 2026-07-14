@@ -104,16 +104,6 @@ namespace RFIDBaggage.Video
                 return;
             }
 
-            if (videoPlaybackManager.IsPlayerPrepared(VideoContentType.Idle))
-            {
-                transitionController.ShowIdleVideo();
-                videoPlaybackManager.PlayIfPlayerPrepared(VideoContentType.Idle);
-                ReleaseStaticBackgroundAfterIdleIsVisible();
-                videoPlaybackManager.StopContent();
-                gameFlowManager.NotifyIdlePrepared();
-                return;
-            }
-
             string idlePath = videoSystemConfig.IdleVideoRelativePath;
             if (!ValidateFilePath(idlePath, "Idle video"))
             {

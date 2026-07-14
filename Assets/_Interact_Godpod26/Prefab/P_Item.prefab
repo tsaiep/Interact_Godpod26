@@ -425,8 +425,8 @@ MonoBehaviour:
         TargetRenderer: {fileID: 8342116991832552732}
         ExtraTargetRenderers: []
         MaterialID: 0
-        PropertyName: _BaseColor
-        PropertyType: 0
+        PropertyName: _Selected
+        PropertyType: 1
         NewColor: {r: 1, g: 0.6789727, b: 0, a: 1}
         NewFloat: 1
         NewInt: 0
@@ -919,8 +919,8 @@ MonoBehaviour:
         TargetRenderer: {fileID: 8342116991832552732}
         ExtraTargetRenderers: []
         MaterialID: 0
-        PropertyName: _BaseColor
-        PropertyType: 0
+        PropertyName: _Wrong
+        PropertyType: 1
         NewColor: {r: 1, g: 0, b: 0, a: 1}
         NewFloat: 1
         NewInt: 0
@@ -929,7 +929,7 @@ MonoBehaviour:
         NewScale: {x: 0, y: 0}
         NewVector: {x: 0, y: 0, z: 0, w: 0}
         InterpolateValue: 1
-        Duration: 0.1
+        Duration: 0.5
         InterpolationCurve:
           MMTweenDefinitionType: 1
           MMTweenCurve: 4
@@ -946,7 +946,16 @@ MonoBehaviour:
               inWeight: 0.33333334
               outWeight: 0.33333334
             - serializedVersion: 3
-              time: 0.5
+              time: 0.02230218
+              value: 1
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 136
+              weightedMode: 0
+              inWeight: 0.33333334
+              outWeight: 0.33333334
+            - serializedVersion: 3
+              time: 0.7
               value: 1
               inSlope: 0
               outSlope: 0
@@ -1517,10 +1526,10 @@ MonoBehaviour:
         TargetRenderer: {fileID: 8342116991832552732}
         ExtraTargetRenderers: []
         MaterialID: 0
-        PropertyName: _BaseColor
-        PropertyType: 0
+        PropertyName: _Selected
+        PropertyType: 1
         NewColor: {r: 1, g: 1, b: 1, a: 1}
-        NewFloat: 1
+        NewFloat: 0
         NewInt: 0
         NewTexture: {fileID: 0}
         NewOffset: {x: 0, y: 0}
@@ -1697,7 +1706,8 @@ MonoBehaviour:
   - rid: 1618627654594592771
   - rid: 1618627654594592866
   - rid: 1618627654594592865
-  - rid: 1618627654594592881
+  - rid: 1618627674125107260
+  - rid: 1618627674125107261
   KeepPlayModeChanges: 0
   PerformanceMode: 0
   RestoreInitialValuesOnDisable: 0
@@ -1786,9 +1796,9 @@ MonoBehaviour:
         Mode: 0
         AnimateScaleTarget: {fileID: 4163266740092902244}
         MovementMode: 0
-        AnimateScaleDuration: 0.2
+        AnimateScaleDuration: 0.65
         AnimatePositionSpeed: 1
-        RemapCurveZero: 1
+        RemapCurveZero: 1.3
         RemapCurveOne: 1.3
         Offset: 0
         AnimateX: 1
@@ -1799,31 +1809,22 @@ MonoBehaviour:
             serializedVersion: 2
             m_Curve:
             - serializedVersion: 3
-              time: 0.0014381409
+              time: 0
               value: 1
-              inSlope: 3.344581
-              outSlope: 3.344581
-              tangentMode: 0
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 34
               weightedMode: 0
               inWeight: 0
-              outWeight: 0.2423221
+              outWeight: 0
             - serializedVersion: 3
-              time: 0.5007193
-              value: 0.019145697
-              inSlope: 0.00000051212515
-              outSlope: 0.00000051212515
-              tangentMode: 0
-              weightedMode: 0
-              inWeight: 0.33333334
-              outWeight: 0.16077736
-            - serializedVersion: 3
-              time: 0.9985657
+              time: 1
               value: 1
-              inSlope: -3.0705013
-              outSlope: -3.0705013
-              tangentMode: 0
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 34
               weightedMode: 0
-              inWeight: 0.15029699
+              inWeight: 0
               outWeight: 0
             m_PreInfinity: 2
             m_PostInfinity: 2
@@ -1840,31 +1841,22 @@ MonoBehaviour:
             serializedVersion: 2
             m_Curve:
             - serializedVersion: 3
-              time: 0.0014381409
+              time: 0
               value: 1
-              inSlope: 3.344581
-              outSlope: 3.344581
-              tangentMode: 0
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 34
               weightedMode: 0
               inWeight: 0
-              outWeight: 0.2423221
+              outWeight: 0
             - serializedVersion: 3
-              time: 0.5007193
-              value: 0.019145697
-              inSlope: 0.00000051212515
-              outSlope: 0.00000051212515
-              tangentMode: 0
-              weightedMode: 0
-              inWeight: 0.33333334
-              outWeight: 0.16077736
-            - serializedVersion: 3
-              time: 0.9985657
+              time: 1
               value: 1
-              inSlope: -3.0705013
-              outSlope: -3.0705013
-              tangentMode: 0
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 34
               weightedMode: 0
-              inWeight: 0.15029699
+              inWeight: 0
               outWeight: 0
             m_PreInfinity: 2
             m_PostInfinity: 2
@@ -1881,31 +1873,22 @@ MonoBehaviour:
             serializedVersion: 2
             m_Curve:
             - serializedVersion: 3
-              time: 0.0014381409
+              time: 0
               value: 1
-              inSlope: 3.344581
-              outSlope: 3.344581
-              tangentMode: 0
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 34
               weightedMode: 0
               inWeight: 0
-              outWeight: 0.2423221
+              outWeight: 0
             - serializedVersion: 3
-              time: 0.5007193
-              value: 0.019145697
-              inSlope: 0.00000051212515
-              outSlope: 0.00000051212515
-              tangentMode: 0
-              weightedMode: 0
-              inWeight: 0.33333334
-              outWeight: 0.16077736
-            - serializedVersion: 3
-              time: 0.9985657
+              time: 1
               value: 1
-              inSlope: -3.0705013
-              outSlope: -3.0705013
-              tangentMode: 0
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 34
               weightedMode: 0
-              inWeight: 0.15029699
+              inWeight: 0
               outWeight: 0
             m_PreInfinity: 2
             m_PostInfinity: 2
@@ -1951,7 +1934,7 @@ MonoBehaviour:
           TimescaleMode: 0
           ExcludeFromHoldingPauses: 0
           ContributeToTotalDuration: 1
-          InitialDelay: 0.2
+          InitialDelay: 0.65
           CooldownDuration: 0
           InterruptsOnStop: 1
           NumberOfRepeats: 0
@@ -2101,10 +2084,10 @@ MonoBehaviour:
         DebugActive: 0
         AnimatePositionTarget: {fileID: 4483014109817950810}
         Mode: 0
-        Space: 0
+        Space: 1
         RandomizeRemap: 0
         MovementMode: 0
-        AnimatePositionDuration: 0.2
+        AnimatePositionDuration: 0.65
         AnimatePositionSpeed: 1
         AnimatePositionTween:
           MMTweenDefinitionType: 1
@@ -2115,20 +2098,20 @@ MonoBehaviour:
             - serializedVersion: 3
               time: 0
               value: 0
-              inSlope: 2
-              outSlope: 2
-              tangentMode: 0
+              inSlope: 1.000076
+              outSlope: 1.000076
+              tangentMode: 34
               weightedMode: 0
               inWeight: 0
-              outWeight: 0
+              outWeight: 0.33333334
             - serializedVersion: 3
-              time: 1
-              value: 1
-              inSlope: 0
-              outSlope: 0
+              time: 1.0028687
+              value: 1.002945
+              inSlope: 0.022013834
+              outSlope: 0.022013834
               tangentMode: 0
               weightedMode: 0
-              inWeight: 0
+              inWeight: 0.13381289
               outWeight: 0
             m_PreInfinity: 2
             m_PostInfinity: 2
@@ -2293,10 +2276,10 @@ MonoBehaviour:
           EnumConditions: 0000000000000000000000000000000000000000000000000000000000000000
         AllowAdditivePlays: 0
         RelativePosition: 1
-        DeterminePositionsOnPlay: 0
+        DeterminePositionsOnPlay: 1
         InitialPosition: {x: 0, y: 0, z: 0}
         DestinationPosition: {x: 0, y: 0.5, z: 0}
-        InitialPositionTransform: {fileID: 0}
+        InitialPositionTransform: {fileID: 4163266740092902244}
         DestinationPositionTransform: {fileID: 0}
         AnimatePositionCurveX:
           serializedVersion: 2
@@ -2322,11 +2305,11 @@ MonoBehaviour:
           m_PreInfinity: 2
           m_PostInfinity: 2
           m_RotationOrder: 4
-    - rid: 1618627654594592881
+    - rid: 1618627674125107260
       type: {class: MMF_MaterialSetProperty, ns: MoreMountains.Feedbacks, asm: MoreMountains.Tools}
       data:
         Active: 1
-        UniqueID: 648314428
+        UniqueID: 1240550420
         Label: Material Set Property
         OriginalLabel: Material Set Property
         ChannelMode: 0
@@ -2399,17 +2382,17 @@ MonoBehaviour:
         TargetRenderer: {fileID: 8342116991832552732}
         ExtraTargetRenderers: []
         MaterialID: 0
-        PropertyName: _BaseColor
-        PropertyType: 0
-        NewColor: {r: 0.58830357, g: 1, b: 0, a: 1}
-        NewFloat: 1
+        PropertyName: _Selected
+        PropertyType: 1
+        NewColor: {r: 1, g: 0, b: 0, a: 1}
+        NewFloat: 0
         NewInt: 0
         NewTexture: {fileID: 0}
         NewOffset: {x: 0, y: 0}
         NewScale: {x: 0, y: 0}
         NewVector: {x: 0, y: 0, z: 0, w: 0}
         InterpolateValue: 1
-        Duration: 0.1
+        Duration: 0.65
         InterpolationCurve:
           MMTweenDefinitionType: 1
           MMTweenCurve: 4
@@ -2418,22 +2401,150 @@ MonoBehaviour:
             m_Curve:
             - serializedVersion: 3
               time: 0
-              value: 0
-              inSlope: 2
-              outSlope: 2
-              tangentMode: 0
-              weightedMode: 0
-              inWeight: 0
-              outWeight: 0
-            - serializedVersion: 3
-              time: 1
               value: 1
               inSlope: 0
               outSlope: 0
-              tangentMode: 0
+              tangentMode: 136
+              weightedMode: 0
+              inWeight: 0.33333334
+              outWeight: 0.33333334
+            - serializedVersion: 3
+              time: 0.10935253
+              value: 1
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 136
+              weightedMode: 0
+              inWeight: 0.33333334
+              outWeight: 0.33333334
+            - serializedVersion: 3
+              time: 1
+              value: 0
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 136
+              weightedMode: 0
+              inWeight: 0.33333334
+              outWeight: 0.33333334
+            m_PreInfinity: 2
+            m_PostInfinity: 2
+            m_RotationOrder: 4
+          Initialized: 0
+          ConditionPropertyName: InterpolateValue
+          EnumConditionPropertyName: 
+          EnumConditions: 0000000000000000000000000000000000000000000000000000000000000000
+    - rid: 1618627674125107261
+      type: {class: MMF_MaterialSetProperty, ns: MoreMountains.Feedbacks, asm: MoreMountains.Tools}
+      data:
+        Active: 1
+        UniqueID: 1060826793
+        Label: Material Set Property
+        OriginalLabel: Material Set Property
+        ChannelMode: 0
+        Channel: 0
+        MMChannelDefinition: {fileID: 0}
+        Chance: 100
+        Timing:
+          TimescaleMode: 0
+          ExcludeFromHoldingPauses: 0
+          ContributeToTotalDuration: 1
+          InitialDelay: 0
+          CooldownDuration: 0
+          InterruptsOnStop: 1
+          NumberOfRepeats: 0
+          RepeatForever: 0
+          DelayBetweenRepeats: 1
+          PlayCount: 0
+          LimitPlayCount: 0
+          MaxPlayCount: 3
+          SetPlayCountToZeroOnReset: 0
+          MMFeedbacksDirectionCondition: 0
+          PlayDirection: 0
+          ConstantIntensity: 0
+          UseIntensityInterval: 0
+          IntensityIntervalMin: 0
+          IntensityIntervalMax: 0
+          Sequence: {fileID: 0}
+          TrackID: 0
+          Quantized: 0
+          TargetBPM: 120
+        AutomatedTargetAcquisition:
+          Mode: 0
+          ChildIndex: 0
+        RandomizeOutput: 0
+        RandomMultiplier: {x: 0.8, y: 1}
+        RandomizeDuration: 0
+        RandomDurationMultiplier: {x: 0.5, y: 2}
+        UseRange: 0
+        RangeDistance: 5
+        UseRangeFalloff: 0
+        RangeFalloff:
+          serializedVersion: 2
+          m_Curve:
+          - serializedVersion: 3
+            time: 0
+            value: 1
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 0
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          - serializedVersion: 3
+            time: 1
+            value: 0
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 0
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          m_PreInfinity: 2
+          m_PostInfinity: 2
+          m_RotationOrder: 4
+        RemapRangeFalloff: {x: 0, y: 1}
+        AutomaticShakerSetupButton:
+          ButtonText: 
+        Owner: {fileID: 7602722956828076631}
+        DebugActive: 0
+        TargetRenderer: {fileID: 8342116991832552732}
+        ExtraTargetRenderers: []
+        MaterialID: 0
+        PropertyName: _Alpha_Control
+        PropertyType: 1
+        NewColor: {r: 1, g: 0, b: 0, a: 1}
+        NewFloat: 0
+        NewInt: 0
+        NewTexture: {fileID: 0}
+        NewOffset: {x: 0, y: 0}
+        NewScale: {x: 0, y: 0}
+        NewVector: {x: 0, y: 0, z: 0, w: 0}
+        InterpolateValue: 1
+        Duration: 0.65
+        InterpolationCurve:
+          MMTweenDefinitionType: 1
+          MMTweenCurve: 4
+          Curve:
+            serializedVersion: 2
+            m_Curve:
+            - serializedVersion: 3
+              time: 0
+              value: 1
+              inSlope: -1
+              outSlope: -1
+              tangentMode: 34
               weightedMode: 0
               inWeight: 0
-              outWeight: 0
+              outWeight: 0.33333334
+            - serializedVersion: 3
+              time: 1
+              value: 0
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 136
+              weightedMode: 0
+              inWeight: 0.33333334
+              outWeight: 0.33333334
             m_PreInfinity: 2
             m_PostInfinity: 2
             m_RotationOrder: 4
@@ -2710,6 +2821,7 @@ MonoBehaviour:
   - rid: 1618627654594592771
   - rid: 1618627654594592865
   - rid: 1618627654594592880
+  - rid: 1618627674125107264
   KeepPlayModeChanges: 0
   PerformanceMode: 0
   RestoreInitialValuesOnDisable: 0
@@ -3087,8 +3199,127 @@ MonoBehaviour:
         TargetRenderer: {fileID: 8342116991832552732}
         ExtraTargetRenderers: []
         MaterialID: 0
-        PropertyName: _BaseColor
-        PropertyType: 0
+        PropertyName: _Selected
+        PropertyType: 1
+        NewColor: {r: 1, g: 1, b: 1, a: 1}
+        NewFloat: 0
+        NewInt: 0
+        NewTexture: {fileID: 0}
+        NewOffset: {x: 0, y: 0}
+        NewScale: {x: 0, y: 0}
+        NewVector: {x: 0, y: 0, z: 0, w: 0}
+        InterpolateValue: 0
+        Duration: 0.1
+        InterpolationCurve:
+          MMTweenDefinitionType: 1
+          MMTweenCurve: 4
+          Curve:
+            serializedVersion: 2
+            m_Curve:
+            - serializedVersion: 3
+              time: 0
+              value: 0
+              inSlope: 2
+              outSlope: 2
+              tangentMode: 0
+              weightedMode: 0
+              inWeight: 0
+              outWeight: 0
+            - serializedVersion: 3
+              time: 1
+              value: 1
+              inSlope: 0
+              outSlope: 0
+              tangentMode: 0
+              weightedMode: 0
+              inWeight: 0
+              outWeight: 0
+            m_PreInfinity: 2
+            m_PostInfinity: 2
+            m_RotationOrder: 4
+          Initialized: 0
+          ConditionPropertyName: InterpolateValue
+          EnumConditionPropertyName: 
+          EnumConditions: 0000000000000000000000000000000000000000000000000000000000000000
+    - rid: 1618627674125107264
+      type: {class: MMF_MaterialSetProperty, ns: MoreMountains.Feedbacks, asm: MoreMountains.Tools}
+      data:
+        Active: 1
+        UniqueID: -973304960
+        Label: Material Set Property
+        OriginalLabel: Material Set Property
+        ChannelMode: 0
+        Channel: 0
+        MMChannelDefinition: {fileID: 0}
+        Chance: 100
+        Timing:
+          TimescaleMode: 0
+          ExcludeFromHoldingPauses: 0
+          ContributeToTotalDuration: 1
+          InitialDelay: 0
+          CooldownDuration: 0
+          InterruptsOnStop: 1
+          NumberOfRepeats: 0
+          RepeatForever: 0
+          DelayBetweenRepeats: 1
+          PlayCount: 0
+          LimitPlayCount: 0
+          MaxPlayCount: 3
+          SetPlayCountToZeroOnReset: 0
+          MMFeedbacksDirectionCondition: 0
+          PlayDirection: 0
+          ConstantIntensity: 0
+          UseIntensityInterval: 0
+          IntensityIntervalMin: 0
+          IntensityIntervalMax: 0
+          Sequence: {fileID: 0}
+          TrackID: 0
+          Quantized: 0
+          TargetBPM: 120
+        AutomatedTargetAcquisition:
+          Mode: 0
+          ChildIndex: 0
+        RandomizeOutput: 0
+        RandomMultiplier: {x: 0.8, y: 1}
+        RandomizeDuration: 0
+        RandomDurationMultiplier: {x: 0.5, y: 2}
+        UseRange: 0
+        RangeDistance: 5
+        UseRangeFalloff: 0
+        RangeFalloff:
+          serializedVersion: 2
+          m_Curve:
+          - serializedVersion: 3
+            time: 0
+            value: 1
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 0
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          - serializedVersion: 3
+            time: 1
+            value: 0
+            inSlope: 0
+            outSlope: 0
+            tangentMode: 0
+            weightedMode: 0
+            inWeight: 0
+            outWeight: 0
+          m_PreInfinity: 2
+          m_PostInfinity: 2
+          m_RotationOrder: 4
+        RemapRangeFalloff: {x: 0, y: 1}
+        AutomaticShakerSetupButton:
+          ButtonText: 
+        Owner: {fileID: 4808520204873622309}
+        DebugActive: 0
+        TargetRenderer: {fileID: 8342116991832552732}
+        ExtraTargetRenderers: []
+        MaterialID: 0
+        PropertyName: _Alpha_Control
+        PropertyType: 1
         NewColor: {r: 1, g: 1, b: 1, a: 1}
         NewFloat: 1
         NewInt: 0

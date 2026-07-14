@@ -348,3 +348,14 @@ Videos/Level01/Level01 Intro 中文.mp4
    1. 確認影片路徑都是 StreamingAssets 相對路徑。
 11. 進 Play Mode 做 Idle、Intro、Success、Failure 測試。
 12. Build Windows Standalone 後確認 build 內有 `StreamingAssets` 資料夾與影片檔。
+
+## 19. Idle 回復與重新播放規則
+
+1. 每次流程回到 `IdlePreparing` 時，都會重新對 `VideoSystemConfig.idleVideoRelativePath` 執行 `Prepare()`。
+2. 不再使用已 prepared 的 Idle player 直接 `Play()` 或 `Resume()`。
+3. Idle 重新載入期間會保留最後一個有效畫面：
+   1. Result 結束後會保留 Result RenderTexture 的最後畫面。
+   2. 錯誤恢復或 Gameplay 轉場時會保留靜態背景，直到 Idle 第一幀完成。
+4. Idle 收到第一幀後才會呼叫 `VideoTransitionController.ShowIdleVideo()`。
+5. `ShowIdleVideo()` 之後才會停止 Content player 與清理靜態背景。
+6. 這個流程的目標是讓 Windows Standalone Build 每次回 Idle 都從 `Idle_Loop.mp4` 開頭順暢播放。
