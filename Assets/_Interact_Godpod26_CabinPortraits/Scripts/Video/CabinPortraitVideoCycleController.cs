@@ -344,7 +344,11 @@ namespace CabinPortraits.Video
 
             if (ShouldLog)
             {
-                Debug.Log($"[CabinPortraits.Video] Preparing index {state.VideoIndex} on Player {state.Slot}.\n{fullPath}", this);
+                Debug.Log(
+                    $"[CabinPortraits.Video] Preparing index {state.VideoIndex} on Player {state.Slot}. " +
+                    $"RenderMode={state.Player.renderMode}, TargetTexture={DescribeTexture(state.Player.targetTexture)}, " +
+                    $"URL={fileUri}\nFullPath={fullPath}",
+                    this);
             }
 
             state.PrepareTimeoutCoroutine = StartCoroutine(PrepareTimeoutRoutine(state, state.Token));
@@ -369,7 +373,11 @@ namespace CabinPortraits.Video
 
             if (ShouldLog)
             {
-                Debug.Log($"[CabinPortraits.Video] Playing index {state.VideoIndex} on Player {state.Slot}.", this);
+                Debug.Log(
+                    $"[CabinPortraits.Video] Playing index {state.VideoIndex} on Player {state.Slot}. " +
+                    $"RenderMode={state.Player.renderMode}, TargetTexture={DescribeTexture(state.Player.targetTexture)}, " +
+                    $"PlayerTexture={DescribeTexture(state.Player.texture)}, DisplayTexture={DescribeTexture(GetTargetTexture(state))}.",
+                    this);
             }
 
             onVideoStarted.Invoke(state.VideoIndex);
@@ -379,6 +387,7 @@ namespace CabinPortraits.Video
         private void ConfigurePlayer(VideoPlayer player)
         {
             player.source = VideoSource.Url;
+            player.renderMode = player.targetTexture != null ? VideoRenderMode.RenderTexture : VideoRenderMode.APIOnly;
             player.playOnAwake = false;
             player.waitForFirstFrame = true;
             player.isLooping = true;
@@ -415,7 +424,8 @@ namespace CabinPortraits.Video
 
             while (state.Token == token && state.IsPreparing && !state.FirstFrameReceived && Time.unscaledTime - start < timeout)
             {
-                if (player != null && player.frame >= 0 && player.texture != null && player.texture.width > 0 && player.texture.height > 0)
+                Texture targetTexture = GetTargetTexture(state);
+                if (player != null && player.frame >= 0 && targetTexture != null && targetTexture.width > 0 && targetTexture.height > 0)
                 {
                     state.FirstFrameReceived = true;
                     break;
@@ -451,6 +461,14 @@ namespace CabinPortraits.Video
             state.IsReady = true;
             onVideoPrepared.Invoke(state.VideoIndex);
 
+            if (ShouldLog)
+            {
+                Debug.Log(
+                    $"[CabinPortraits.Video] Prepared first frame for index {state.VideoIndex} on Player {state.Slot}. " +
+                    $"Frame={player.frame}, TargetTexture={DescribeTexture(player.targetTexture)}, PlayerTexture={DescribeTexture(player.texture)}.",
+                    this);
+            }
+
             if (state.PlayWhenReady)
             {
                 PlaySlot(state);
@@ -468,6 +486,11 @@ namespace CabinPortraits.Video
 
             state.FirstFrameReceived = true;
             player.sendFrameReadyEvents = false;
+
+            if (ShouldLog)
+            {
+                Debug.Log($"[CabinPortraits.Video] Frame ready for index {state.VideoIndex} on Player {state.Slot}. Frame={frameIdx}.", this);
+            }
         }
 
         private void HandleLoopPointReached(VideoPlayer player)
@@ -561,6 +584,11 @@ namespace CabinPortraits.Video
             }
 
             return state.Player.targetTexture != null ? state.Player.targetTexture : state.Player.texture;
+        }
+
+        private static string DescribeTexture(Texture texture)
+        {
+            return texture != null ? $"{texture.name} ({texture.width}x{texture.height})" : "<null>";
         }
 
         private void StopSlot(PlayerSlotState state)

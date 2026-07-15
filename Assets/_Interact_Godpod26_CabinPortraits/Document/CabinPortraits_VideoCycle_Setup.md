@@ -35,12 +35,14 @@ SceneRoot
 
 1. Add `VideoPlayer` to `VideoPlayerA`.
    - Source: URL
+   - Render Mode: Render Texture
    - Play On Awake: off
    - Wait For First Frame: on
    - Target Texture: `RT_CabinPortraitA`
 
 2. Add `VideoPlayer` to `VideoPlayerB`.
    - Source: URL
+   - Render Mode: Render Texture
    - Play On Awake: off
    - Wait For First Frame: on
    - Target Texture: `RT_CabinPortraitB`
@@ -49,6 +51,7 @@ SceneRoot
    - For a single display mesh, assign `Shared Display Renderer`.
    - For two display meshes, assign `Player A Display Renderer` and `Player B Display Renderer`.
    - Assign fallback textures `RT_CabinPortraitA` and `RT_CabinPortraitB`.
+   - If Console logs say `Source=fallback`, the active VideoPlayer did not provide a runtime texture. Check its Target Texture and Render Mode.
 
 4. Add `CabinPortraitVideoCycleController` to `FlowController`.
    - Sequence Config: `CabinPortraitVideoSequenceConfig`
@@ -86,4 +89,3 @@ The index loops as:
 ```text
 0 -> 1 -> 2 -> 3 -> 4 -> 5 -> 0
 ```
-

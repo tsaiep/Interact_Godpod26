@@ -269,7 +269,7 @@ MonoBehaviour:
   videoPlayerA: {fileID: 1728322114}
   videoPlayerB: {fileID: 441029974}
   displayController: {fileID: 1665898248}
-  enableKeyboardInput: 0
+  enableKeyboardInput: 1
   switchKey: 32
   onSwitchRequested:
     m_PersistentCalls:
@@ -315,7 +315,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &955379002
 Transform:
   m_ObjectHideFlags: 0
@@ -356,7 +356,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 8d4836c4d5a092a4795be46eeb3536b7, type: 2}
+  - {fileID: 2100000, guid: 7926b7e532919d641bd6b55dddf12f78, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -405,7 +405,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &986263995
 Transform:
   m_ObjectHideFlags: 0
@@ -580,7 +580,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1678980194
 Transform:
   m_ObjectHideFlags: 0
@@ -621,7 +621,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 9e707ec5e734fa54db212ca463574988, type: 2}
+  - {fileID: 2100000, guid: 8e0f7c43f2cb3ba4291f358f5d7fc69b, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

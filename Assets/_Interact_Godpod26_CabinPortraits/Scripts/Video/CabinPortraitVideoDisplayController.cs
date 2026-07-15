@@ -35,6 +35,9 @@ namespace CabinPortraits.Video
         [SerializeField, Tooltip("Also writes _MainTex for Built-in/Unlit compatible materials.")]
         private bool alsoSetMainTex = true;
 
+        [SerializeField, Tooltip("When enabled, display texture assignments are logged to Console.")]
+        private bool verboseDisplayLogs = true;
+
         private MaterialPropertyBlock sharedPropertyBlock;
         private MaterialPropertyBlock playerAPropertyBlock;
         private MaterialPropertyBlock playerBPropertyBlock;
@@ -46,6 +49,15 @@ namespace CabinPortraits.Video
         {
             InitializePropertyIds();
             ApplyConfiguredTextures();
+
+            if (verboseDisplayLogs)
+            {
+                Debug.Log(
+                    $"[CabinPortraits.Display] Initialized. Shared={DescribeRenderer(sharedDisplayRenderer)}, " +
+                    $"PlayerA={DescribeRenderer(playerADisplayRenderer)}, PlayerB={DescribeRenderer(playerBDisplayRenderer)}, " +
+                    $"FallbackA={DescribeTexture(playerATexture)}, FallbackB={DescribeTexture(playerBTexture)}.",
+                    this);
+            }
         }
 
         private void OnValidate()
@@ -56,6 +68,7 @@ namespace CabinPortraits.Video
         public void ShowSlot(CabinPortraitVideoSlot slot, Texture runtimeTexture)
         {
             Texture texture = runtimeTexture != null ? runtimeTexture : GetConfiguredTexture(slot);
+            bool usingFallback = runtimeTexture == null;
 
             if (sharedDisplayRenderer != null)
             {
@@ -65,8 +78,26 @@ namespace CabinPortraits.Video
 
             if (playerADisplayRenderer != null || playerBDisplayRenderer != null)
             {
+                if (slot == CabinPortraitVideoSlot.A)
+                {
+                    SetRendererTexture(playerADisplayRenderer, texture, ref playerAPropertyBlock);
+                }
+                else
+                {
+                    SetRendererTexture(playerBDisplayRenderer, texture, ref playerBPropertyBlock);
+                }
+
                 SetVisible(playerADisplayRenderer, slot == CabinPortraitVideoSlot.A);
                 SetVisible(playerBDisplayRenderer, slot == CabinPortraitVideoSlot.B);
+            }
+
+            if (verboseDisplayLogs)
+            {
+                Debug.Log(
+                    $"[CabinPortraits.Display] ShowSlot {slot}. Texture={DescribeTexture(texture)}, " +
+                    $"Source={(usingFallback ? "fallback" : "runtime")}, Shared={DescribeRenderer(sharedDisplayRenderer)}, " +
+                    $"PlayerA={DescribeRenderer(playerADisplayRenderer)}, PlayerB={DescribeRenderer(playerBDisplayRenderer)}.",
+                    this);
             }
         }
 
@@ -100,8 +131,18 @@ namespace CabinPortraits.Video
 
         private void SetRendererTexture(Renderer targetRenderer, Texture texture, ref MaterialPropertyBlock propertyBlock)
         {
-            if (targetRenderer == null || texture == null)
+            if (targetRenderer == null)
             {
+                return;
+            }
+
+            if (texture == null)
+            {
+                if (verboseDisplayLogs)
+                {
+                    Debug.LogWarning($"[CabinPortraits.Display] Cannot assign null texture to {targetRenderer.name}.", this);
+                }
+
                 return;
             }
 
@@ -119,6 +160,11 @@ namespace CabinPortraits.Video
             }
 
             targetRenderer.SetPropertyBlock(propertyBlock);
+
+            if (verboseDisplayLogs)
+            {
+                Debug.Log($"[CabinPortraits.Display] Assigned {DescribeTexture(texture)} to {targetRenderer.name}.", this);
+            }
         }
 
         private static void SetVisible(Renderer targetRenderer, bool visible)
@@ -140,6 +186,16 @@ namespace CabinPortraits.Video
             }
 
             texturePropertyId = Shader.PropertyToID(texturePropertyName);
+        }
+
+        private static string DescribeRenderer(Renderer targetRenderer)
+        {
+            return targetRenderer != null ? targetRenderer.name : "<none>";
+        }
+
+        private static string DescribeTexture(Texture texture)
+        {
+            return texture != null ? $"{texture.name} ({texture.width}x{texture.height})" : "<null>";
         }
     }
 }
