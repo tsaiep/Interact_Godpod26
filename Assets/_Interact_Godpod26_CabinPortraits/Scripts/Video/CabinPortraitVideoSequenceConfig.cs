@@ -35,6 +35,9 @@ namespace CabinPortraits.Video
         [SerializeField, Min(0f), Tooltip("Seconds to wait after On Transition Started before stopping the current video and preparing the next one under the fully covered transition.")]
         private float transitionCoverDelay = 1f;
 
+        [SerializeField, Min(0f), Tooltip("Minimum seconds between accepted switch requests. This only keeps input locked; it does not delay video prepare or playback.")]
+        private float switchInputCooldown = 5f;
+
         [SerializeField, Tooltip("When enabled, the video cycle outputs detailed Console logs.")]
         private bool verboseLogs = true;
 
@@ -44,6 +47,7 @@ namespace CabinPortraits.Video
         public float PrepareWarningTimeout => prepareWarningTimeout;
         public float FirstFrameWarningTimeout => firstFrameWarningTimeout;
         public float TransitionCoverDelay => transitionCoverDelay;
+        public float SwitchInputCooldown => switchInputCooldown;
         public bool VerboseLogs => verboseLogs;
         public int VideoCount => videoRelativePaths != null ? videoRelativePaths.Count : 0;
 
@@ -88,6 +92,7 @@ namespace CabinPortraits.Video
             prepareWarningTimeout = Mathf.Max(0.1f, prepareWarningTimeout);
             firstFrameWarningTimeout = Mathf.Max(0.1f, firstFrameWarningTimeout);
             transitionCoverDelay = Mathf.Max(0f, transitionCoverDelay);
+            switchInputCooldown = Mathf.Max(0f, switchInputCooldown);
         }
     }
 }

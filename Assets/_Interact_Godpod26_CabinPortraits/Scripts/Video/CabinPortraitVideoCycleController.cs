@@ -23,6 +23,12 @@ namespace CabinPortraits.Video
     {
     }
 
+    public enum CabinPortraitSwitchKey
+    {
+        Space,
+        Enter
+    }
+
     public sealed class CabinPortraitVideoCycleController : MonoBehaviour
     {
         public enum FlowState
@@ -64,8 +70,8 @@ namespace CabinPortraits.Video
         [SerializeField, Tooltip("When enabled, the controller listens for the configured key in Update.")]
         private bool enableKeyboardInput = true;
 
-        [SerializeField, Tooltip("Key used to request the next video.")]
-        private KeyCode switchKey = KeyCode.Space;
+        [SerializeField, Tooltip("Key used to request the next video. Enter accepts both Return and Keypad Enter.")]
+        private CabinPortraitSwitchKey switchKey = CabinPortraitSwitchKey.Space;
 
         [Header("Runtime Debug")]
         [SerializeField, Tooltip("All flow states for Inspector display only. This list is not used to drive state transitions.")]
@@ -167,9 +173,21 @@ namespace CabinPortraits.Video
 
         private void Update()
         {
-            if (enableKeyboardInput && Input.GetKeyDown(switchKey))
+            if (enableKeyboardInput && IsSwitchKeyDown())
             {
                 RequestNextVideo();
+            }
+        }
+
+        private bool IsSwitchKeyDown()
+        {
+            switch (switchKey)
+            {
+                case CabinPortraitSwitchKey.Enter:
+                    return Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter);
+                case CabinPortraitSwitchKey.Space:
+                default:
+                    return Input.GetKeyDown(KeyCode.Space);
             }
         }
 
@@ -281,6 +299,7 @@ namespace CabinPortraits.Video
 
         private IEnumerator SwitchRoutine()
         {
+            float acceptedAt = Time.unscaledTime;
             inputLocked = true;
             isSwitching = true;
             onInputLocked.Invoke();
@@ -341,8 +360,20 @@ namespace CabinPortraits.Video
 
             TransitionTo(FlowState.ActivePlaying);
             isSwitching = false;
+            yield return WaitForRemainingSwitchCooldown(acceptedAt);
             UnlockInput();
             switchCoroutine = null;
+        }
+
+        private IEnumerator WaitForRemainingSwitchCooldown(float acceptedAt)
+        {
+            float cooldown = sequenceConfig != null ? sequenceConfig.SwitchInputCooldown : 0f;
+            float remaining = Mathf.Max(0f, cooldown - (Time.unscaledTime - acceptedAt));
+
+            if (remaining > 0f)
+            {
+                yield return new WaitForSecondsRealtime(remaining);
+            }
         }
 
         private bool CanAcceptSwitchRequest(out string rejectionReason)

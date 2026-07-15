@@ -24,4 +24,5 @@ MonoBehaviour:
   prepareWarningTimeout: 10
   firstFrameWarningTimeout: 10
   transitionCoverDelay: 1
+  switchInputCooldown: 10
   verboseLogs: 1

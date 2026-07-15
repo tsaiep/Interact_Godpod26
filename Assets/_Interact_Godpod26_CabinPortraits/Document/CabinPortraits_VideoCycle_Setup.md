@@ -62,14 +62,14 @@ SceneRoot
    - Video Player B: `VideoPlayerB`
    - Display Controller: `VideoDisplay`
    - Keyboard Input: enabled
-   - Switch Key: Space
+   - Switch Key: `Space` or `Enter`
 
 5. Use the Unity Events on `CabinPortraitVideoCycleController` to trigger transition visuals.
    - `On Switch Requested`: accepted Space input.
    - `On Transition Started`: fire animation, VFX, shader change, or sound.
    - `On Ready To Reveal`: the next video is visible behind the fully covered transition; start revealing the mask here.
    - `On Video Index Changed`: the visible video has switched.
-   - `On Input Locked` and `On Input Unlocked`: lock/unlock UI hints if needed. There is no fixed cooldown delay.
+   - `On Input Locked` and `On Input Unlocked`: lock/unlock UI hints if needed. `Switch Input Cooldown` controls the minimum time between accepted switch requests.
 
 ## Runtime Flow
 
@@ -86,10 +86,11 @@ prepare the next video to its first frame on the inactive player
 play the next video and show its dedicated renderer behind the covered transition
 invoke On Ready To Reveal
 swap active and standby players
+wait remaining Switch Input Cooldown if needed
 accept Space again
 ```
 
-This keeps the visible playback path clean: while a video is visible, no other VideoPlayer is preparing, pre-rolling, seeking, or decoding in the background. The old video continues during `Transition Cover Delay`; once the transition should fully cover the display, the old player is stopped and the next player is prepared under the mask. `Prepare Warning Timeout` and `First Frame Warning Timeout` only print warnings and continue waiting; they do not enter `ErrorRecovery`.
+This keeps the visible playback path clean: while a video is visible, no other VideoPlayer is preparing, pre-rolling, seeking, or decoding in the background. The old video continues during `Transition Cover Delay`; once the transition should fully cover the display, the old player is stopped and the next player is prepared under the mask. `Prepare Warning Timeout` and `First Frame Warning Timeout` only print warnings and continue waiting; they do not enter `ErrorRecovery`. `Switch Input Cooldown` only delays input unlock after the video switch has completed, so it does not delay video prepare or playback.
 
 The index loops as:
 
