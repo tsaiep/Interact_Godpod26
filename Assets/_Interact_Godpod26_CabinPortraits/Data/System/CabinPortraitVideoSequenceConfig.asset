@@ -21,13 +21,7 @@ MonoBehaviour:
   - CabinPortraits/Videos/Video_06.mp4
   startIndex: 0
   playOnStart: 1
-  prepareTimeout: 10
-  firstFrameTimeout: 10
-  prerollStandbyBeforeSwitch: 1
-  standbyPrerollTimeout: 120
-  transitionSwitchDelay: 1
-  hiddenWarmupDuration: 1
-  muteAudioDuringHiddenWarmup: 1
-  prepareNextDelayAfterSwitch: 10
-  inputCooldown: 5
+  prepareWarningTimeout: 10
+  firstFrameWarningTimeout: 10
+  transitionCoverDelay: 1
   verboseLogs: 1

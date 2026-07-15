@@ -30,10 +30,8 @@ namespace CabinPortraits.Video
             SystemInitializing,
             ActivePreparing,
             ActivePlaying,
-            StandbyPreparing,
-            ReadyForSwitch,
             Switching,
-            HiddenWarming,
+            CoveredPreparing,
             ErrorRecovery
         }
 
@@ -42,10 +40,8 @@ namespace CabinPortraits.Video
             FlowState.SystemInitializing,
             FlowState.ActivePreparing,
             FlowState.ActivePlaying,
-            FlowState.StandbyPreparing,
-            FlowState.ReadyForSwitch,
             FlowState.Switching,
-            FlowState.HiddenWarming,
+            FlowState.CoveredPreparing,
             FlowState.ErrorRecovery
         };
 
@@ -79,29 +75,33 @@ namespace CabinPortraits.Video
         private FlowState currentState = FlowState.SystemInitializing;
 
         [Header("Unity Events")]
-        [SerializeField, Tooltip("Invoked when a Space request is accepted. Args: current index, next index.")]
+        [SerializeField, Tooltip("Invoked when a switch request is accepted. Args: current index, next index.")]
         private CabinPortraitVideoSwitchEvent onSwitchRequested = new CabinPortraitVideoSwitchEvent();
 
-        [SerializeField, Tooltip("Invoked immediately before waiting transitionSwitchDelay.")]
+        [SerializeField, Tooltip("Invoked before waiting Transition Cover Delay. Start the covering transition here.")]
         private UnityEvent onTransitionStarted = new UnityEvent();
 
-        [SerializeField, Tooltip("Invoked after the hidden warm-up has completed and the next video texture is visible behind the mask. Use this to start revealing the mask.")]
+        [SerializeField, Tooltip("Invoked after the next video is visible behind the fully covered transition. Reveal the mask here.")]
         private CabinPortraitVideoIndexEvent onReadyToReveal = new CabinPortraitVideoIndexEvent();
 
         [SerializeField, Tooltip("Invoked after the active visible video index changes.")]
         private CabinPortraitVideoIndexEvent onVideoIndexChanged = new CabinPortraitVideoIndexEvent();
 
-        [SerializeField, Tooltip("Invoked when a video is ready. Active startup uses first-frame ready; standby can require hidden full pre-roll first.")]
+        [SerializeField, Tooltip("Invoked when a video has been prepared to its first frame.")]
         private CabinPortraitVideoIndexEvent onVideoPrepared = new CabinPortraitVideoIndexEvent();
 
         [SerializeField, Tooltip("Invoked when a video starts playing visibly.")]
         private CabinPortraitVideoIndexEvent onVideoStarted = new CabinPortraitVideoIndexEvent();
 
-        [SerializeField, Tooltip("Invoked when a Space request is ignored. Reason is provided for debugging.")]
+        [SerializeField, Tooltip("Invoked when a switch request is ignored. Reason is provided for debugging.")]
         private CabinPortraitVideoMessageEvent onInputRejected = new CabinPortraitVideoMessageEvent();
 
-        [SerializeField] private UnityEvent onInputCooldownStarted = new UnityEvent();
-        [SerializeField] private UnityEvent onInputCooldownEnded = new UnityEvent();
+        [SerializeField, Tooltip("Invoked when input is locked for startup or switching.")]
+        private UnityEvent onInputLocked = new UnityEvent();
+
+        [SerializeField, Tooltip("Invoked when input is unlocked after startup or switching.")]
+        private UnityEvent onInputUnlocked = new UnityEvent();
+
         [SerializeField] private CabinPortraitVideoMessageEvent onVideoError = new CabinPortraitVideoMessageEvent();
 
         private sealed class PlayerSlotState
@@ -120,22 +120,17 @@ namespace CabinPortraits.Video
             public bool IsReady;
             public bool IsPlaying;
             public bool FirstFrameReceived;
-            public bool PrerollBeforeReady;
-            public bool IsPrerolling;
-            public bool PrerollLoopReceived;
             public string RelativePath = string.Empty;
             public string FullPath = string.Empty;
             public string Url = string.Empty;
-            public Coroutine PrepareTimeoutCoroutine;
-            public Coroutine FirstFrameCoroutine;
         }
 
         private PlayerSlotState slotAState;
         private PlayerSlotState slotBState;
         private PlayerSlotState activeSlot;
-        private PlayerSlotState standbySlot;
+        private PlayerSlotState inactiveSlot;
+        private Coroutine startupCoroutine;
         private Coroutine switchCoroutine;
-        private Coroutine standbyPrepareCoroutine;
         private int tokenCounter;
         private int currentIndex = -1;
         private bool initialized;
@@ -182,10 +177,8 @@ namespace CabinPortraits.Video
         {
             Unsubscribe(videoPlayerA);
             Unsubscribe(videoPlayerB);
+            StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
-            StopCoroutineIfRunning(ref standbyPrepareCoroutine);
-            StopSlotCoroutines(slotAState);
-            StopSlotCoroutines(slotBState);
         }
 
         private void OnValidate()
@@ -200,25 +193,21 @@ namespace CabinPortraits.Video
                 return;
             }
 
+            StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
-            StopCoroutineIfRunning(ref standbyPrepareCoroutine);
             StopSlot(slotAState);
             StopSlot(slotBState);
 
             initialized = true;
-            inputLocked = false;
+            inputLocked = true;
             isSwitching = false;
             currentIndex = -1;
             activeSlot = slotAState;
-            standbySlot = slotBState;
+            inactiveSlot = slotBState;
             currentState = FlowState.SystemInitializing;
 
-            if (!TransitionTo(FlowState.ActivePreparing))
-            {
-                return;
-            }
-
-            PrepareSlot(activeSlot, sequenceConfig.StartIndex, false);
+            onInputLocked.Invoke();
+            startupCoroutine = StartCoroutine(InitializeAndPlayRoutine());
         }
 
         public bool RequestNextVideo()
@@ -250,8 +239,8 @@ namespace CabinPortraits.Video
             isSwitching = false;
             currentIndex = -1;
             currentState = FlowState.SystemInitializing;
+            StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
-            StopCoroutineIfRunning(ref standbyPrepareCoroutine);
             StopSlot(slotAState);
             StopSlot(slotBState);
 
@@ -261,29 +250,57 @@ namespace CabinPortraits.Video
             }
         }
 
+        private IEnumerator InitializeAndPlayRoutine()
+        {
+            if (!TransitionTo(FlowState.ActivePreparing))
+            {
+                UnlockInput();
+                yield break;
+            }
+
+            yield return PrepareSlotForFirstFrame(activeSlot, sequenceConfig.StartIndex);
+
+            if (currentState == FlowState.ErrorRecovery || activeSlot == null || !activeSlot.IsReady)
+            {
+                UnlockInput();
+                yield break;
+            }
+
+            if (!PlayVisibleSlot(activeSlot))
+            {
+                UnlockInput();
+                yield break;
+            }
+
+            currentIndex = activeSlot.VideoIndex;
+            onVideoIndexChanged.Invoke(currentIndex);
+            TransitionTo(FlowState.ActivePlaying);
+            UnlockInput();
+            startupCoroutine = null;
+        }
+
         private IEnumerator SwitchRoutine()
         {
-            float acceptedAt = Time.unscaledTime;
             inputLocked = true;
             isSwitching = true;
-            onInputCooldownStarted.Invoke();
+            onInputLocked.Invoke();
 
             PlayerSlotState previousActiveSlot = activeSlot;
-            PlayerSlotState nextActiveSlot = standbySlot;
+            PlayerSlotState nextActiveSlot = inactiveSlot;
             int previousIndex = currentIndex;
-            int nextIndex = nextActiveSlot.VideoIndex;
+            int nextIndex = sequenceConfig.GetNextIndex(currentIndex);
 
             onSwitchRequested.Invoke(previousIndex, nextIndex);
 
             if (!TransitionTo(FlowState.Switching))
             {
-                UnlockInputAfterFailedSwitch();
+                UnlockSwitchAfterFailure();
                 yield break;
             }
 
             onTransitionStarted.Invoke();
 
-            float transitionDelay = sequenceConfig != null ? sequenceConfig.TransitionSwitchDelay : 0.5f;
+            float transitionDelay = sequenceConfig != null ? sequenceConfig.TransitionCoverDelay : 0.5f;
             if (transitionDelay > 0f)
             {
                 yield return new WaitForSecondsRealtime(transitionDelay);
@@ -291,96 +308,41 @@ namespace CabinPortraits.Video
 
             if (currentState != FlowState.Switching)
             {
-                UnlockInputAfterFailedSwitch();
+                UnlockSwitchAfterFailure();
                 yield break;
             }
 
-            if (!TransitionTo(FlowState.HiddenWarming))
+            if (!TransitionTo(FlowState.CoveredPreparing))
             {
-                UnlockInputAfterFailedSwitch();
+                UnlockSwitchAfterFailure();
                 yield break;
             }
 
-            if (!BeginHiddenWarmup(nextActiveSlot))
-            {
-                UnlockInputAfterFailedSwitch();
-                yield break;
-            }
+            StopSlot(previousActiveSlot);
+            yield return PrepareSlotForFirstFrame(nextActiveSlot, nextIndex);
 
-            float hiddenWarmupDuration = sequenceConfig != null ? sequenceConfig.HiddenWarmupDuration : 0.5f;
-            if (hiddenWarmupDuration > 0f)
+            if (currentState == FlowState.ErrorRecovery || nextActiveSlot == null || !nextActiveSlot.IsReady)
             {
-                yield return new WaitForSecondsRealtime(hiddenWarmupDuration);
-            }
-
-            if (currentState != FlowState.HiddenWarming)
-            {
-                UnlockInputAfterFailedSwitch();
+                UnlockSwitchAfterFailure();
                 yield break;
             }
 
             if (!PlayVisibleSlot(nextActiveSlot))
             {
-                UnlockInputAfterFailedSwitch();
+                UnlockSwitchAfterFailure();
                 yield break;
             }
 
-            PauseSlot(previousActiveSlot);
-
             activeSlot = nextActiveSlot;
-            standbySlot = previousActiveSlot;
+            inactiveSlot = previousActiveSlot;
             currentIndex = nextIndex;
             onVideoIndexChanged.Invoke(currentIndex);
             onReadyToReveal.Invoke(currentIndex);
 
             TransitionTo(FlowState.ActivePlaying);
-            ScheduleStandbyPrepare(sequenceConfig != null ? sequenceConfig.PrepareNextDelayAfterSwitch : 0f);
             isSwitching = false;
-
-            float inputCooldown = sequenceConfig != null ? sequenceConfig.InputCooldown : 2f;
-            float remainingCooldown = Mathf.Max(0f, inputCooldown - (Time.unscaledTime - acceptedAt));
-            if (remainingCooldown > 0f)
-            {
-                yield return new WaitForSecondsRealtime(remainingCooldown);
-            }
-
-            inputLocked = false;
-            onInputCooldownEnded.Invoke();
+            UnlockInput();
             switchCoroutine = null;
-        }
-
-        private void ScheduleStandbyPrepare(float delay)
-        {
-            StopCoroutineIfRunning(ref standbyPrepareCoroutine);
-            standbyPrepareCoroutine = StartCoroutine(StandbyPrepareRoutine(delay));
-        }
-
-        private IEnumerator StandbyPrepareRoutine(float delay)
-        {
-            if (delay > 0f)
-            {
-                if (ShouldLog)
-                {
-                    int nextIndex = sequenceConfig != null ? sequenceConfig.GetNextIndex(currentIndex) : -1;
-                    Debug.Log($"[CabinPortraits.Video] Waiting {delay:0.###} seconds before preparing standby index {nextIndex}.", this);
-                }
-
-                yield return new WaitForSecondsRealtime(delay);
-            }
-
-            standbyPrepareCoroutine = null;
-
-            if (!initialized || currentState != FlowState.ActivePlaying || standbySlot == null || standbySlot == activeSlot)
-            {
-                yield break;
-            }
-
-            if (!TransitionTo(FlowState.StandbyPreparing))
-            {
-                yield break;
-            }
-
-            PrepareSlot(standbySlot, sequenceConfig.GetNextIndex(currentIndex), sequenceConfig.PrerollStandbyBeforeSwitch);
         }
 
         private bool CanAcceptSwitchRequest(out string rejectionReason)
@@ -401,13 +363,13 @@ namespace CabinPortraits.Video
 
             if (inputLocked || isSwitching)
             {
-                rejectionReason = "Input is cooling down or a switch is already running.";
+                rejectionReason = "Input is locked or a switch is already running.";
                 return false;
             }
 
-            if (currentState != FlowState.ReadyForSwitch)
+            if (currentState != FlowState.ActivePlaying)
             {
-                rejectionReason = $"Flow state is {currentState}. Expected {FlowState.ReadyForSwitch}.";
+                rejectionReason = $"Flow state is {currentState}. Expected {FlowState.ActivePlaying}.";
                 return false;
             }
 
@@ -417,58 +379,137 @@ namespace CabinPortraits.Video
                 return false;
             }
 
-            if (standbySlot == null || standbySlot.Player == null)
+            if (inactiveSlot == null || inactiveSlot.Player == null)
             {
-                rejectionReason = "Standby VideoPlayer is missing.";
-                return false;
-            }
-
-            if (!standbySlot.IsReady || !standbySlot.Player.isPrepared)
-            {
-                rejectionReason = "Next video is not prepared yet.";
+                rejectionReason = "Inactive VideoPlayer is missing.";
                 return false;
             }
 
             return true;
         }
 
-        private void PrepareSlot(PlayerSlotState state, int videoIndex, bool prerollBeforeReady)
+        private IEnumerator PrepareSlotForFirstFrame(PlayerSlotState state, int videoIndex)
         {
+            if (!TryBeginPrepareSlot(state, videoIndex, out int token))
+            {
+                yield break;
+            }
+
+            VideoPlayer player = state.Player;
+            float prepareWarningTimeout = sequenceConfig != null ? sequenceConfig.PrepareWarningTimeout : 10f;
+            float prepareStartedAt = Time.unscaledTime;
+            bool prepareWarningLogged = false;
+
+            while (state.Token == token && state.IsPreparing && player != null && !player.isPrepared)
+            {
+                if (!prepareWarningLogged && Time.unscaledTime - prepareStartedAt >= prepareWarningTimeout)
+                {
+                    prepareWarningLogged = true;
+                    Debug.LogWarning(
+                        $"[CabinPortraits.Video] Prepare is still waiting after {prepareWarningTimeout:0.##} seconds for index {state.VideoIndex}. Continuing without entering ErrorRecovery.\n{state.FullPath}",
+                        this);
+                }
+
+                yield return null;
+            }
+
+            if (state.Token != token || !state.IsPreparing || currentState == FlowState.ErrorRecovery)
+            {
+                yield break;
+            }
+
+            SetSlotAudioMuted(state, true);
+
+            if (player.canStep)
+            {
+                player.StepForward();
+            }
+
+            if (!player.isPlaying)
+            {
+                player.Play();
+            }
+
+            float firstFrameWarningTimeout = sequenceConfig != null ? sequenceConfig.FirstFrameWarningTimeout : 5f;
+            float firstFrameStartedAt = Time.unscaledTime;
+            bool firstFrameWarningLogged = false;
+
+            while (state.Token == token && state.IsPreparing && !HasFirstFrame(player))
+            {
+                if (!firstFrameWarningLogged && Time.unscaledTime - firstFrameStartedAt >= firstFrameWarningTimeout)
+                {
+                    firstFrameWarningLogged = true;
+                    Debug.LogWarning(
+                        $"[CabinPortraits.Video] First frame is still waiting after {firstFrameWarningTimeout:0.##} seconds for index {state.VideoIndex}. Continuing without entering ErrorRecovery.\n{state.FullPath}",
+                        this);
+                }
+
+                yield return null;
+            }
+
+            if (state.Token != token || !state.IsPreparing || currentState == FlowState.ErrorRecovery)
+            {
+                yield break;
+            }
+
+            if (player.isPlaying)
+            {
+                player.Pause();
+            }
+
+            player.sendFrameReadyEvents = false;
+            state.IsPreparing = false;
+            state.IsReady = true;
+            state.IsPlaying = false;
+            state.FirstFrameReceived = true;
+            onVideoPrepared.Invoke(state.VideoIndex);
+
+            if (ShouldLog)
+            {
+                Debug.Log(
+                    $"[CabinPortraits.Video] First frame ready for index {state.VideoIndex} on Player {state.Slot}. " +
+                    $"Frame={player.frame}, Time={player.time:0.###}, TargetTexture={DescribeTexture(player.targetTexture)}, PlayerTexture={DescribeTexture(player.texture)}.",
+                    this);
+            }
+        }
+
+        private bool TryBeginPrepareSlot(PlayerSlotState state, int videoIndex, out int token)
+        {
+            token = 0;
+
             if (state == null || state.Player == null || sequenceConfig == null)
             {
                 ReportFailure("Cannot prepare video because a required reference is missing.");
-                return;
+                return false;
             }
 
             if (!sequenceConfig.TryGetVideoPath(videoIndex, out string relativePath))
             {
                 ReportFailure($"Missing video path at index {videoIndex}.");
-                return;
+                return false;
             }
 
             if (!CabinPortraitStreamingAssetsPathUtility.TryBuildFilePath(relativePath, out string fullPath) ||
                 !CabinPortraitStreamingAssetsPathUtility.TryBuildFileUri(relativePath, out string fileUri))
             {
                 ReportFailure($"Invalid StreamingAssets path: {relativePath}");
-                return;
+                return false;
             }
 
             if (!File.Exists(fullPath))
             {
                 ReportFailure($"Video file not found.\nRelative Path: {relativePath}\nFull Path: {fullPath}\nURL: {fileUri}");
-                return;
+                return false;
             }
 
             StopSlot(state);
-            state.Token = ++tokenCounter;
+            token = ++tokenCounter;
+            state.Token = token;
             state.VideoIndex = sequenceConfig.WrapIndex(videoIndex);
             state.IsPreparing = true;
             state.IsReady = false;
             state.IsPlaying = false;
             state.FirstFrameReceived = false;
-            state.PrerollBeforeReady = prerollBeforeReady;
-            state.IsPrerolling = false;
-            state.PrerollLoopReceived = false;
             state.RelativePath = relativePath;
             state.FullPath = fullPath;
             state.Url = fileUri;
@@ -482,13 +523,12 @@ namespace CabinPortraits.Video
             {
                 Debug.Log(
                     $"[CabinPortraits.Video] Preparing index {state.VideoIndex} on Player {state.Slot}. " +
-                    $"FullPreroll={prerollBeforeReady}, " +
                     $"RenderMode={state.Player.renderMode}, TargetTexture={DescribeTexture(state.Player.targetTexture)}, " +
                     $"URL={fileUri}\nFullPath={fullPath}",
                     this);
             }
 
-            state.PrepareTimeoutCoroutine = StartCoroutine(PrepareTimeoutRoutine(state, state.Token));
+            return true;
         }
 
         private bool PlayVisibleSlot(PlayerSlotState state)
@@ -527,506 +567,22 @@ namespace CabinPortraits.Video
             return true;
         }
 
-        private bool BeginHiddenWarmup(PlayerSlotState state)
-        {
-            if (state == null || state.Player == null || !state.IsReady || !state.Player.isPrepared)
-            {
-                ReportFailure("Cannot warm up because the target video is not prepared.");
-                return false;
-            }
-
-            bool muteDuringWarmup = sequenceConfig == null || sequenceConfig.MuteAudioDuringHiddenWarmup;
-            SetSlotAudioMuted(state, muteDuringWarmup);
-            state.Player.isLooping = true;
-
-            if (!state.Player.isPlaying)
-            {
-                state.Player.Play();
-            }
-
-            state.IsPlaying = true;
-
-            if (ShouldLog)
-            {
-                Debug.Log(
-                    $"[CabinPortraits.Video] Hidden warm-up started for index {state.VideoIndex} on Player {state.Slot}. " +
-                    $"Muted={muteDuringWarmup}, Time={state.Player.time:0.###}, Frame={state.Player.frame}.",
-                    this);
-            }
-
-            return true;
-        }
-
-        private void PauseSlot(PlayerSlotState state)
-        {
-            if (state == null || state.Player == null)
-            {
-                return;
-            }
-
-            SetSlotAudioMuted(state, true);
-
-            if (state.Player.isPlaying)
-            {
-                state.Player.Pause();
-            }
-
-            state.Player.sendFrameReadyEvents = false;
-            state.IsPreparing = false;
-            state.IsReady = false;
-            state.IsPlaying = false;
-            state.FirstFrameReceived = false;
-            state.PrerollBeforeReady = false;
-            state.IsPrerolling = false;
-            state.PrerollLoopReceived = false;
-
-            if (ShouldLog)
-            {
-                Debug.Log($"[CabinPortraits.Video] Paused old active index {state.VideoIndex} on Player {state.Slot}.", this);
-            }
-        }
-
         private void ConfigurePlayer(VideoPlayer player)
         {
             player.source = VideoSource.Url;
             player.playOnAwake = false;
             player.waitForFirstFrame = true;
             player.isLooping = true;
-            player.sendFrameReadyEvents = true;
-        }
-
-        private void HandlePrepareCompleted(VideoPlayer player)
-        {
-            PlayerSlotState state = GetState(player);
-            if (state == null || !state.IsPreparing)
-            {
-                return;
-            }
-
-            StopCoroutineIfRunning(ref state.PrepareTimeoutCoroutine);
-            state.FirstFrameCoroutine = StartCoroutine(FirstFrameRoutine(state, state.Token));
-        }
-
-        private IEnumerator FirstFrameRoutine(PlayerSlotState state, int token)
-        {
-            float timeout = sequenceConfig != null ? sequenceConfig.FirstFrameTimeout : 5f;
-            float start = Time.unscaledTime;
-            VideoPlayer player = state.Player;
-
-            SetSlotAudioMuted(state, true);
-
-            if (player != null && player.canStep)
-            {
-                player.StepForward();
-            }
-
-            if (player != null && !player.isPlaying)
-            {
-                player.Play();
-            }
-
-            while (state.Token == token && state.IsPreparing && !state.FirstFrameReceived && Time.unscaledTime - start < timeout)
-            {
-                if (player != null && player.frame >= 0 && player.texture != null && player.texture.width > 0 && player.texture.height > 0)
-                {
-                    state.FirstFrameReceived = true;
-                    break;
-                }
-
-                yield return null;
-            }
-
-            if (state.Token != token || !state.IsPreparing)
-            {
-                state.FirstFrameCoroutine = null;
-                yield break;
-            }
-
-            if (!state.FirstFrameReceived)
-            {
-                state.FirstFrameCoroutine = null;
-                ReportFailure($"First frame timeout after {timeout:0.##} seconds for index {state.VideoIndex}.\n{state.FullPath}");
-                yield break;
-            }
-
-            if (player != null)
-            {
-                player.sendFrameReadyEvents = false;
-            }
-
-            if (state.PrerollBeforeReady)
-            {
-                yield return FullPrerollStandbyRoutine(state, token, player);
-
-                state.FirstFrameCoroutine = null;
-
-                if (state.Token != token || !state.IsPreparing || currentState == FlowState.ErrorRecovery)
-                {
-                    yield break;
-                }
-
-                CompletePreparedSlot(
-                    state,
-                    player,
-                    $"Standby full pre-roll ready for index {state.VideoIndex} on Player {state.Slot}. " +
-                    $"Frame={player.frame}, Time={player.time:0.###}, TargetTexture={DescribeTexture(player.targetTexture)}, PlayerTexture={DescribeTexture(player.texture)}.");
-                yield break;
-            }
-
-            state.FirstFrameCoroutine = null;
-
-            if (player != null && player.isPlaying)
-            {
-                player.Pause();
-            }
-
-            CompletePreparedSlot(
-                state,
-                player,
-                $"First frame ready for index {state.VideoIndex} on Player {state.Slot}. " +
-                $"Frame={player.frame}, TargetTexture={DescribeTexture(player.targetTexture)}, PlayerTexture={DescribeTexture(player.texture)}.");
-        }
-
-        private IEnumerator FullPrerollStandbyRoutine(PlayerSlotState state, int token, VideoPlayer player)
-        {
-            if (player == null)
-            {
-                ReportFailure($"Cannot pre-roll index {state.VideoIndex} because the VideoPlayer is missing.");
-                yield break;
-            }
-
-            state.IsPrerolling = true;
-            state.PrerollLoopReceived = false;
-            state.IsPlaying = true;
-
-            SetSlotAudioMuted(state, true);
             player.sendFrameReadyEvents = false;
-            player.isLooping = false;
-
-            if (!player.isPlaying)
-            {
-                player.Play();
-            }
-
-            float timeout = GetStandbyPrerollTimeout(player);
-            float start = Time.unscaledTime;
-
-            if (ShouldLog)
-            {
-                Debug.Log(
-                    $"[CabinPortraits.Video] Hidden full pre-roll started for index {state.VideoIndex} on Player {state.Slot}. " +
-                    $"Timeout={timeout:0.###}, Length={player.length:0.###}, Time={player.time:0.###}, Frame={player.frame}.",
-                    this);
-            }
-
-            while (state.Token == token &&
-                   state.IsPreparing &&
-                   state.IsPrerolling &&
-                   !state.PrerollLoopReceived &&
-                   Time.unscaledTime - start < timeout)
-            {
-                if (HasNaturallyReachedEnd(player))
-                {
-                    state.PrerollLoopReceived = true;
-                    break;
-                }
-
-                yield return null;
-            }
-
-            if (state.Token != token || !state.IsPreparing)
-            {
-                yield break;
-            }
-
-            if (!state.PrerollLoopReceived)
-            {
-                state.IsPrerolling = false;
-                state.IsPlaying = false;
-                ReportFailure($"Hidden pre-roll timeout after {timeout:0.##} seconds for index {state.VideoIndex}.\n{state.FullPath}");
-                yield break;
-            }
-
-            if (player.isPlaying)
-            {
-                player.Pause();
-            }
-
-            state.IsPlaying = false;
-            player.isLooping = true;
-
-            if (ShouldLog)
-            {
-                Debug.Log(
-                    $"[CabinPortraits.Video] Hidden full pre-roll completed for index {state.VideoIndex} on Player {state.Slot}. " +
-                    $"Rewinding to start. Time={player.time:0.###}, Frame={player.frame}.",
-                    this);
-            }
-
-            yield return RewindPreparedPlayerToStart(state, token, player);
-
-            if (state.Token == token && state.IsPreparing)
-            {
-                state.IsPrerolling = false;
-            }
         }
 
-        private IEnumerator RewindPreparedPlayerToStart(PlayerSlotState state, int token, VideoPlayer player)
+        private static bool HasFirstFrame(VideoPlayer player)
         {
-            if (player == null)
-            {
-                ReportFailure($"Cannot rewind index {state.VideoIndex} because the VideoPlayer is missing.");
-                yield break;
-            }
-
-            if (!player.canSetTime)
-            {
-                ReportFailure($"Cannot rewind index {state.VideoIndex} because {player.name} does not support time seeking.");
-                yield break;
-            }
-
-            SetSlotAudioMuted(state, true);
-            player.time = 0d;
-
-            if (!player.isPlaying)
-            {
-                player.Play();
-            }
-
-            yield return null;
-
-            float timeout = sequenceConfig != null ? sequenceConfig.FirstFrameTimeout : 5f;
-            float start = Time.unscaledTime;
-
-            while (state.Token == token && state.IsPreparing && Time.unscaledTime - start < timeout)
-            {
-                if (IsAtStartWithTexture(player))
-                {
-                    break;
-                }
-
-                yield return null;
-            }
-
-            if (state.Token != token || !state.IsPreparing)
-            {
-                yield break;
-            }
-
-            if (!IsAtStartWithTexture(player))
-            {
-                ReportFailure($"Rewind-to-start timeout after {timeout:0.##} seconds for index {state.VideoIndex}.\n{state.FullPath}");
-                yield break;
-            }
-
-            if (player.isPlaying)
-            {
-                player.Pause();
-            }
-
-            state.IsPlaying = false;
-
-            if (ShouldLog)
-            {
-                Debug.Log(
-                    $"[CabinPortraits.Video] Hidden pre-rolled index {state.VideoIndex} rewound and paused on Player {state.Slot}. " +
-                    $"Time={player.time:0.###}, Frame={player.frame}.",
-                    this);
-            }
-        }
-
-        private void CompletePreparedSlot(PlayerSlotState state, VideoPlayer player, string logMessage)
-        {
-            if (player != null)
-            {
-                player.sendFrameReadyEvents = false;
-            }
-
-            state.IsPreparing = false;
-            state.IsReady = true;
-            state.IsPlaying = false;
-            state.IsPrerolling = false;
-            onVideoPrepared.Invoke(state.VideoIndex);
-
-            if (ShouldLog)
-            {
-                Debug.Log($"[CabinPortraits.Video] {logMessage}", this);
-            }
-
-            HandlePreparedSlotReady(state);
-        }
-
-        private void HandlePreparedSlotReady(PlayerSlotState state)
-        {
-            if (currentState == FlowState.ActivePreparing)
-            {
-                if (state != activeSlot)
-                {
-                    LogUnexpectedPreparedSlot(state, FlowState.ActivePreparing);
-                    return;
-                }
-
-                if (!PlayVisibleSlot(activeSlot))
-                {
-                    return;
-                }
-
-                currentIndex = activeSlot.VideoIndex;
-                onVideoIndexChanged.Invoke(currentIndex);
-
-                if (TransitionTo(FlowState.ActivePlaying))
-                {
-                    ScheduleStandbyPrepare(0f);
-                }
-
-                return;
-            }
-
-            if (currentState == FlowState.StandbyPreparing)
-            {
-                if (state != standbySlot)
-                {
-                    LogUnexpectedPreparedSlot(state, FlowState.StandbyPreparing);
-                    return;
-                }
-
-                TransitionTo(FlowState.ReadyForSwitch);
-                return;
-            }
-
-            if (ShouldLog)
-            {
-                Debug.Log($"[CabinPortraits.Video] Ignored prepared-slot callback while state is {currentState}.", this);
-            }
-        }
-
-        private float GetStandbyPrerollTimeout(VideoPlayer player)
-        {
-            float configuredTimeout = sequenceConfig != null ? sequenceConfig.StandbyPrerollTimeout : 120f;
-
-            if (player != null && IsFinitePositive(player.length))
-            {
-                configuredTimeout = Mathf.Max(configuredTimeout, (float)player.length + 5f);
-            }
-
-            return configuredTimeout;
-        }
-
-        private static bool HasNaturallyReachedEnd(VideoPlayer player)
-        {
-            if (player == null)
-            {
-                return false;
-            }
-
-            if (player.isPlaying)
-            {
-                return false;
-            }
-
-            if (IsFinitePositive(player.length) && player.time >= Math.Max(0d, player.length - 0.1d))
-            {
-                return true;
-            }
-
-            ulong frameCount = player.frameCount;
-            return frameCount > 0UL && player.frame >= 0 && (ulong)player.frame >= frameCount - 1UL;
-        }
-
-        private static bool IsAtStartWithTexture(VideoPlayer player)
-        {
-            if (player == null || player.texture == null || player.texture.width <= 0 || player.texture.height <= 0)
-            {
-                return false;
-            }
-
-            if (player.frame >= 0 && player.frame <= 2)
-            {
-                return true;
-            }
-
-            if (player.frameCount > 0UL)
-            {
-                return false;
-            }
-
-            return player.time >= 0d && player.time <= 0.25d;
-        }
-
-        private static bool IsFinitePositive(double value)
-        {
-            return !double.IsNaN(value) && !double.IsInfinity(value) && value > 0d;
-        }
-
-        private void HandleFrameReady(VideoPlayer player, long frameIdx)
-        {
-            PlayerSlotState state = GetState(player);
-            if (state == null || !state.IsPreparing)
-            {
-                return;
-            }
-
-            state.FirstFrameReceived = true;
-            player.sendFrameReadyEvents = false;
-
-            if (ShouldLog)
-            {
-                Debug.Log($"[CabinPortraits.Video] Frame ready for index {state.VideoIndex} on Player {state.Slot}. Frame={frameIdx}.", this);
-            }
-        }
-
-        private void HandleLoopPointReached(VideoPlayer player)
-        {
-            PlayerSlotState state = GetState(player);
-            if (state == null || player == null)
-            {
-                return;
-            }
-
-            if (state.IsPreparing && state.IsPrerolling && !player.isLooping)
-            {
-                state.PrerollLoopReceived = true;
-
-                if (ShouldLog)
-                {
-                    Debug.Log(
-                        $"[CabinPortraits.Video] Hidden pre-roll loop point reached for index {state.VideoIndex} on Player {state.Slot}. " +
-                        $"Time={player.time:0.###}, Frame={player.frame}.",
-                        this);
-                }
-
-                return;
-            }
-
-            if (!state.IsPlaying || player.isLooping)
-            {
-                return;
-            }
-
-            state.IsPlaying = false;
-        }
-
-        private void HandleErrorReceived(VideoPlayer player, string message)
-        {
-            PlayerSlotState state = GetState(player);
-            string context = state != null
-                ? $"Player {state.Slot}, index {state.VideoIndex}, path {state.RelativePath}"
-                : "Unknown player";
-
-            ReportFailure($"VideoPlayer error: {message}\n{context}");
-        }
-
-        private IEnumerator PrepareTimeoutRoutine(PlayerSlotState state, int token)
-        {
-            float timeout = sequenceConfig != null ? sequenceConfig.PrepareTimeout : 10f;
-            yield return new WaitForSecondsRealtime(timeout);
-
-            if (state.Token != token || !state.IsPreparing)
-            {
-                yield break;
-            }
-
-            ReportFailure($"Prepare timeout after {timeout:0.##} seconds for index {state.VideoIndex}.\n{state.FullPath}");
+            return player != null &&
+                   player.frame >= 0 &&
+                   player.texture != null &&
+                   player.texture.width > 0 &&
+                   player.texture.height > 0;
         }
 
         private void SetSlotAudioMuted(PlayerSlotState state, bool muted)
@@ -1068,6 +624,32 @@ namespace CabinPortraits.Video
             }
         }
 
+        private void StopSlot(PlayerSlotState state)
+        {
+            if (state == null)
+            {
+                return;
+            }
+
+            state.Token = ++tokenCounter;
+
+            if (state.Player != null)
+            {
+                SetSlotAudioMuted(state, false);
+                state.Player.sendFrameReadyEvents = false;
+                state.Player.Stop();
+            }
+
+            state.IsPreparing = false;
+            state.IsReady = false;
+            state.IsPlaying = false;
+            state.FirstFrameReceived = false;
+            state.VideoIndex = -1;
+            state.RelativePath = string.Empty;
+            state.FullPath = string.Empty;
+            state.Url = string.Empty;
+        }
+
         private void ReportFailure(string message)
         {
             Debug.LogWarning($"[CabinPortraits.Video] {message}", this);
@@ -1079,11 +661,17 @@ namespace CabinPortraits.Video
             }
         }
 
-        private void UnlockInputAfterFailedSwitch()
+        private void UnlockInput()
+        {
+            inputLocked = false;
+            onInputUnlocked.Invoke();
+        }
+
+        private void UnlockSwitchAfterFailure()
         {
             isSwitching = false;
             inputLocked = false;
-            onInputCooldownEnded.Invoke();
+            onInputUnlocked.Invoke();
             switchCoroutine = null;
         }
 
@@ -1145,58 +733,6 @@ namespace CabinPortraits.Video
             return texture != null ? $"{texture.name} ({texture.width}x{texture.height})" : "<null>";
         }
 
-        private void StopSlot(PlayerSlotState state)
-        {
-            if (state == null)
-            {
-                return;
-            }
-
-            state.Token = ++tokenCounter;
-            StopSlotCoroutines(state);
-
-            if (state.Player != null)
-            {
-                SetSlotAudioMuted(state, false);
-                state.Player.sendFrameReadyEvents = false;
-                state.Player.Stop();
-            }
-
-            state.IsPreparing = false;
-            state.IsReady = false;
-            state.IsPlaying = false;
-            state.FirstFrameReceived = false;
-            state.PrerollBeforeReady = false;
-            state.IsPrerolling = false;
-            state.PrerollLoopReceived = false;
-            state.VideoIndex = -1;
-            state.RelativePath = string.Empty;
-            state.FullPath = string.Empty;
-            state.Url = string.Empty;
-        }
-
-        private void StopSlotCoroutines(PlayerSlotState state)
-        {
-            if (state == null)
-            {
-                return;
-            }
-
-            StopCoroutineIfRunning(ref state.PrepareTimeoutCoroutine);
-            StopCoroutineIfRunning(ref state.FirstFrameCoroutine);
-        }
-
-        private void StopCoroutineIfRunning(ref Coroutine coroutine)
-        {
-            if (coroutine == null)
-            {
-                return;
-            }
-
-            StopCoroutine(coroutine);
-            coroutine = null;
-        }
-
         private void Subscribe(VideoPlayer player)
         {
             if (player == null)
@@ -1204,15 +740,8 @@ namespace CabinPortraits.Video
                 return;
             }
 
-            player.prepareCompleted -= HandlePrepareCompleted;
-            player.loopPointReached -= HandleLoopPointReached;
             player.errorReceived -= HandleErrorReceived;
-            player.frameReady -= HandleFrameReady;
-
-            player.prepareCompleted += HandlePrepareCompleted;
-            player.loopPointReached += HandleLoopPointReached;
             player.errorReceived += HandleErrorReceived;
-            player.frameReady += HandleFrameReady;
         }
 
         private void Unsubscribe(VideoPlayer player)
@@ -1222,10 +751,17 @@ namespace CabinPortraits.Video
                 return;
             }
 
-            player.prepareCompleted -= HandlePrepareCompleted;
-            player.loopPointReached -= HandleLoopPointReached;
             player.errorReceived -= HandleErrorReceived;
-            player.frameReady -= HandleFrameReady;
+        }
+
+        private void HandleErrorReceived(VideoPlayer player, string message)
+        {
+            PlayerSlotState state = GetState(player);
+            string context = state != null
+                ? $"Player {state.Slot}, index {state.VideoIndex}, path {state.RelativePath}"
+                : "Unknown player";
+
+            ReportFailure($"VideoPlayer error: {message}\n{context}");
         }
 
         private bool HasRequiredReferences()
@@ -1299,14 +835,10 @@ namespace CabinPortraits.Video
                 case FlowState.ActivePreparing:
                     return to == FlowState.ActivePlaying;
                 case FlowState.ActivePlaying:
-                    return to == FlowState.StandbyPreparing;
-                case FlowState.StandbyPreparing:
-                    return to == FlowState.ReadyForSwitch;
-                case FlowState.ReadyForSwitch:
                     return to == FlowState.Switching;
                 case FlowState.Switching:
-                    return to == FlowState.HiddenWarming;
-                case FlowState.HiddenWarming:
+                    return to == FlowState.CoveredPreparing;
+                case FlowState.CoveredPreparing:
                     return to == FlowState.ActivePlaying;
                 case FlowState.ErrorRecovery:
                     return to == FlowState.ActivePreparing;
@@ -1315,16 +847,15 @@ namespace CabinPortraits.Video
             }
         }
 
-        private void LogUnexpectedPreparedSlot(PlayerSlotState state, FlowState expectedState)
+        private void StopCoroutineIfRunning(ref Coroutine coroutine)
         {
-            if (!ShouldLog)
+            if (coroutine == null)
             {
                 return;
             }
 
-            string slotName = state != null ? state.Slot.ToString() : "<null>";
-            int videoIndex = state != null ? state.VideoIndex : -1;
-            Debug.Log($"[CabinPortraits.Video] Ignored prepared slot {slotName}, index {videoIndex}. Expected active state {expectedState}.", this);
+            StopCoroutine(coroutine);
+            coroutine = null;
         }
 
         private bool ShouldLog => sequenceConfig == null || sequenceConfig.VerboseLogs;

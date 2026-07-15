@@ -514,6 +514,8 @@ MonoBehaviour:
   displayController: {fileID: 1665898248}
   enableKeyboardInput: 1
   switchKey: 32
+  visibleStateSequence: 000000000100000002000000030000000400000005000000
+  currentState: 0
   onSwitchRequested:
     m_PersistentCalls:
       m_Calls: []
@@ -532,6 +534,9 @@ MonoBehaviour:
           m_StringArgument: Trans
           m_BoolArgument: 0
         m_CallState: 2
+  onReadyToReveal:
+    m_PersistentCalls:
+      m_Calls: []
   onVideoIndexChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -544,10 +549,10 @@ MonoBehaviour:
   onInputRejected:
     m_PersistentCalls:
       m_Calls: []
-  onInputCooldownStarted:
+  onInputLocked:
     m_PersistentCalls:
       m_Calls: []
-  onInputCooldownEnded:
+  onInputUnlocked:
     m_PersistentCalls:
       m_Calls: []
   onVideoError:

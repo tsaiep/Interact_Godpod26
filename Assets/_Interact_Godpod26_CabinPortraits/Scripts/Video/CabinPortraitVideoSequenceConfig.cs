@@ -12,12 +12,12 @@ namespace CabinPortraits.Video
         [SerializeField, Tooltip("Video file paths relative to StreamingAssets. The controller loops through this list in order.")]
         private List<string> videoRelativePaths = new List<string>
         {
-            "CabinPortraits/Videos/Video_00.mp4",
             "CabinPortraits/Videos/Video_01.mp4",
             "CabinPortraits/Videos/Video_02.mp4",
             "CabinPortraits/Videos/Video_03.mp4",
             "CabinPortraits/Videos/Video_04.mp4",
-            "CabinPortraits/Videos/Video_05.mp4"
+            "CabinPortraits/Videos/Video_05.mp4",
+            "CabinPortraits/Videos/Video_06.mp4"
         };
 
         [SerializeField, Min(0), Tooltip("Initial video index shown when the scene starts.")]
@@ -26,32 +26,14 @@ namespace CabinPortraits.Video
         [SerializeField, Tooltip("When enabled, the controller prepares and plays the start index on Start.")]
         private bool playOnStart = true;
 
-        [SerializeField, Min(0.1f), Tooltip("Maximum seconds to wait for VideoPlayer Prepare.")]
-        private float prepareTimeout = 10f;
+        [SerializeField, Min(0.1f), Tooltip("Seconds before logging that VideoPlayer Prepare is taking longer than expected. This is diagnostic only and does not enter ErrorRecovery.")]
+        private float prepareWarningTimeout = 10f;
 
-        [SerializeField, Min(0.1f), Tooltip("Maximum seconds to wait for a visible first frame after Prepare.")]
-        private float firstFrameTimeout = 5f;
+        [SerializeField, Min(0.1f), Tooltip("Seconds before logging that the first frame is taking longer than expected. This is diagnostic only and does not enter ErrorRecovery.")]
+        private float firstFrameWarningTimeout = 10f;
 
-        [SerializeField, Tooltip("When enabled, standby videos must play hidden through one complete loop before input can switch to them.")]
-        private bool prerollStandbyBeforeSwitch = true;
-
-        [SerializeField, Min(1f), Tooltip("Maximum seconds to wait for a hidden standby pre-roll loop. If the video length is longer, length plus a safety margin is used.")]
-        private float standbyPrerollTimeout = 120f;
-
-        [SerializeField, Min(0f), Tooltip("Delay after Space is accepted before the prepared next video becomes visible.")]
-        private float transitionSwitchDelay = 0.5f;
-
-        [SerializeField, Min(0f), Tooltip("Seconds to let the prepared next video play hidden while the transition fully covers the display.")]
-        private float hiddenWarmupDuration = 0.5f;
-
-        [SerializeField, Tooltip("Mutes the next video while it plays hidden during warm-up.")]
-        private bool muteAudioDuringHiddenWarmup = true;
-
-        [SerializeField, Min(0f), Tooltip("Delay after the new video becomes visible before preparing the following video. This avoids competing with the first seconds of playback.")]
-        private float prepareNextDelayAfterSwitch = 1f;
-
-        [SerializeField, Min(0f), Tooltip("Minimum seconds between accepted Space inputs.")]
-        private float inputCooldown = 2f;
+        [SerializeField, Min(0f), Tooltip("Seconds to wait after On Transition Started before stopping the current video and preparing the next one under the fully covered transition.")]
+        private float transitionCoverDelay = 1f;
 
         [SerializeField, Tooltip("When enabled, the video cycle outputs detailed Console logs.")]
         private bool verboseLogs = true;
@@ -59,15 +41,9 @@ namespace CabinPortraits.Video
         public IReadOnlyList<string> VideoRelativePaths => videoRelativePaths;
         public int StartIndex => Mathf.Clamp(startIndex, 0, Mathf.Max(0, VideoCount - 1));
         public bool PlayOnStart => playOnStart;
-        public float PrepareTimeout => prepareTimeout;
-        public float FirstFrameTimeout => firstFrameTimeout;
-        public bool PrerollStandbyBeforeSwitch => prerollStandbyBeforeSwitch;
-        public float StandbyPrerollTimeout => standbyPrerollTimeout;
-        public float TransitionSwitchDelay => transitionSwitchDelay;
-        public float HiddenWarmupDuration => hiddenWarmupDuration;
-        public bool MuteAudioDuringHiddenWarmup => muteAudioDuringHiddenWarmup;
-        public float PrepareNextDelayAfterSwitch => prepareNextDelayAfterSwitch;
-        public float InputCooldown => inputCooldown;
+        public float PrepareWarningTimeout => prepareWarningTimeout;
+        public float FirstFrameWarningTimeout => firstFrameWarningTimeout;
+        public float TransitionCoverDelay => transitionCoverDelay;
         public bool VerboseLogs => verboseLogs;
         public int VideoCount => videoRelativePaths != null ? videoRelativePaths.Count : 0;
 
@@ -109,13 +85,9 @@ namespace CabinPortraits.Video
             }
 
             startIndex = Mathf.Max(0, startIndex);
-            prepareTimeout = Mathf.Max(0.1f, prepareTimeout);
-            firstFrameTimeout = Mathf.Max(0.1f, firstFrameTimeout);
-            standbyPrerollTimeout = Mathf.Max(1f, standbyPrerollTimeout);
-            transitionSwitchDelay = Mathf.Max(0f, transitionSwitchDelay);
-            hiddenWarmupDuration = Mathf.Max(0f, hiddenWarmupDuration);
-            prepareNextDelayAfterSwitch = Mathf.Max(0f, prepareNextDelayAfterSwitch);
-            inputCooldown = Mathf.Max(0f, inputCooldown);
+            prepareWarningTimeout = Mathf.Max(0.1f, prepareWarningTimeout);
+            firstFrameWarningTimeout = Mathf.Max(0.1f, firstFrameWarningTimeout);
+            transitionCoverDelay = Mathf.Max(0f, transitionCoverDelay);
         }
     }
 }

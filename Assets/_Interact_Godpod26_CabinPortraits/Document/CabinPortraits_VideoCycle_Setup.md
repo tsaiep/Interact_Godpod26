@@ -67,33 +67,29 @@ SceneRoot
 5. Use the Unity Events on `CabinPortraitVideoCycleController` to trigger transition visuals.
    - `On Switch Requested`: accepted Space input.
    - `On Transition Started`: fire animation, VFX, shader change, or sound.
+   - `On Ready To Reveal`: the next video is visible behind the fully covered transition; start revealing the mask here.
    - `On Video Index Changed`: the visible video has switched.
-   - `On Input Cooldown Started` and `On Input Cooldown Ended`: lock/unlock UI hints if needed.
+   - `On Input Locked` and `On Input Unlocked`: lock/unlock UI hints if needed. There is no fixed cooldown delay.
 
 ## Runtime Flow
 
-On Start, the controller prepares and plays the start index on player A. After the first video is visible, player B prepares the next index. If `Preroll Standby Before Switch` is enabled, player B plays the next video hidden and muted through one full loop, rewinds to the start, pauses, and only then enters `ReadyForSwitch`.
+On Start, the controller prepares the start index to its first frame and plays it on player A. It does not prepare the next video in the background while the active video is visible.
 
 When Space is accepted:
 
 ```text
 invoke On Switch Requested
 invoke On Transition Started
-wait Transition Switch Delay
-play prepared standby player hidden behind the fully covered transition
-wait Hidden Warmup Duration
-show standby player by enabling its dedicated renderer
+wait Transition Cover Delay
+stop the current active player while the transition fully covers the display
+prepare the next video to its first frame on the inactive player
+play the next video and show its dedicated renderer behind the covered transition
 invoke On Ready To Reveal
-pause old active player
 swap active and standby players
-wait Prepare Next Delay After Switch
-stop old active player and prepare the following index on it
-hidden full pre-roll the following index on the standby player
-wait remaining inputCooldown
 accept Space again
 ```
 
-This is the A/B double-buffer flow used like the LuggageCheck idle-to-intro path with an extra hidden warm-up stage. While one player is visible, the other player is prepared, played hidden through its first complete loop, rewound to the start, and paused. On switch, the current video continues while the transition covers the display. After `Transition Switch Delay`, the fully pre-rolled standby player starts playing hidden for `Hidden Warmup Duration`. Only after that warm-up does the display switch by disabling the old renderer and enabling the new renderer, then invoke `On Ready To Reveal`, which should start revealing the mask. The old player is paused after the display switch, then stopped/prepared later so it does not compete with the first visible seconds of the new video.
+This keeps the visible playback path clean: while a video is visible, no other VideoPlayer is preparing, pre-rolling, seeking, or decoding in the background. The old video continues during `Transition Cover Delay`; once the transition should fully cover the display, the old player is stopped and the next player is prepared under the mask. `Prepare Warning Timeout` and `First Frame Warning Timeout` only print warnings and continue waiting; they do not enter `ErrorRecovery`.
 
 The index loops as:
 
