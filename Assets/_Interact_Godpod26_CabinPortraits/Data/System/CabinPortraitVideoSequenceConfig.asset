@@ -23,6 +23,6 @@ MonoBehaviour:
   playOnStart: 1
   prepareTimeout: 10
   firstFrameTimeout: 5
-  transitionSwitchDelay: 0.5
+  transitionSwitchDelay: 1
   inputCooldown: 2
   verboseLogs: 1
