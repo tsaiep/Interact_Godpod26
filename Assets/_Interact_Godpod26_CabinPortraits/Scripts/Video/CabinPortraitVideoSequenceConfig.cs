@@ -12,12 +12,12 @@ namespace CabinPortraits.Video
         [SerializeField, Tooltip("Video file paths relative to StreamingAssets. The controller loops through this list in order.")]
         private List<string> videoRelativePaths = new List<string>
         {
-            "Videos/Interaction02/Video_00.mp4",
-            "Videos/Interaction02/Video_01.mp4",
-            "Videos/Interaction02/Video_02.mp4",
-            "Videos/Interaction02/Video_03.mp4",
-            "Videos/Interaction02/Video_04.mp4",
-            "Videos/Interaction02/Video_05.mp4"
+            "CabinPortraits/Videos/Video_00.mp4",
+            "CabinPortraits/Videos/Video_01.mp4",
+            "CabinPortraits/Videos/Video_02.mp4",
+            "CabinPortraits/Videos/Video_03.mp4",
+            "CabinPortraits/Videos/Video_04.mp4",
+            "CabinPortraits/Videos/Video_05.mp4"
         };
 
         [SerializeField, Min(0), Tooltip("Initial video index shown when the scene starts.")]

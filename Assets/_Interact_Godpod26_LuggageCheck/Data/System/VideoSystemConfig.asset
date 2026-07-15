@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9b342cb011724bd44be55062801b60c7, type: 3}
   m_Name: VideoSystemConfig
   m_EditorClassIdentifier: Assembly-CSharp::RFIDBaggage.Video.VideoSystemConfig
-  idleVideoRelativePath: Videos/Common/Idle_Loop.mp4
+  idleVideoRelativePath: LuggageCheck/Videos/Common/Idle_Loop.mp4
   prepareTimeout: 10
   firstFrameTimeout: 5
   imageLoadTimeout: 10

@@ -53,8 +53,8 @@ Assets/StreamingAssets/
 ```text
 Assets/
 └── StreamingAssets/
-    └── Videos/
-        └── Interaction02/
+    └── CabinPortraits/
+        └── Videos/
             ├── Video_00.mp4
             ├── Video_01.mp4
             ├── Video_02.mp4

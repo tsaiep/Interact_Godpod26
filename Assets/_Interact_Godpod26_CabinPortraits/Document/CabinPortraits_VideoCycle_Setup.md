@@ -5,7 +5,7 @@
 - Config: `Assets/_Interact_Godpod26_CabinPortraits/Data/System/CabinPortraitVideoSequenceConfig.asset`
 - RenderTexture A: `Assets/_Interact_Godpod26_CabinPortraits/RenderTextures/RT_CabinPortraitA.renderTexture`
 - RenderTexture B: `Assets/_Interact_Godpod26_CabinPortraits/RenderTextures/RT_CabinPortraitB.renderTexture`
-- Expected video folder: `Assets/StreamingAssets/Videos/Interaction02/`
+- Expected video folder: `Assets/StreamingAssets/CabinPortraits/Videos/`
 - Default files:
   - `Video_00.mp4`
   - `Video_01.mp4`

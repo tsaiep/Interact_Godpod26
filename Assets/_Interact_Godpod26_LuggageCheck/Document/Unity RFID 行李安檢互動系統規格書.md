@@ -607,31 +607,32 @@ Gameplay 狀態開始時：
 
 所有影片檔案存放於 Unity 專案的以下資料夾：
 
-`Assets/StreamingAssets/Videos/`
+`Assets/StreamingAssets/LuggageCheck/Videos/`
 
 建議資料夾結構如下：
 
 ```text
 Assets/
 └── StreamingAssets/
-    └── Videos/
-        ├── Common/
-        │   └── Idle_Loop.mp4
-        │
-        ├── Level01/
-        │   ├── Level01_Intro.mp4
-        │   ├── Level01_Success.mp4
-        │   └── Level01_Failure.mp4
-        │
-        ├── Level02/
-        │   ├── Level02_Intro.mp4
-        │   ├── Level02_Success.mp4
-        │   └── Level02_Failure.mp4
-        │
-        └── Level06/
-            ├── Level06_Intro.mp4
-            ├── Level06_Success.mp4
-            └── Level06_Failure.mp4
+    └── LuggageCheck/
+        └── Videos/
+            ├── Common/
+            │   └── Idle_Loop.mp4
+            │
+            ├── Level01/
+            │   ├── Level01_Intro.mp4
+            │   ├── Level01_Success.mp4
+            │   └── Level01_Failure.mp4
+            │
+            ├── Level02/
+            │   ├── Level02_Intro.mp4
+            │   ├── Level02_Success.mp4
+            │   └── Level02_Failure.mp4
+            │
+            └── Level06/
+                ├── Level06_Intro.mp4
+                ├── Level06_Success.mp4
+                └── Level06_Failure.mp4
 ```
 
 靜態背景圖片需與影片一樣存放於 StreamingAssets 中，並透過相對路徑由關卡資料引用，以確保在 Build 後仍可正確讀取與顯示。
@@ -654,7 +655,7 @@ Path.Combine(
 例如：
 
 ```text
-Videos/Level01/Level01_Intro.mp4
+LuggageCheck/Videos/Level01/Level01_Intro.mp4
 ```
 
 不可將以下形式直接寫入關卡資料：

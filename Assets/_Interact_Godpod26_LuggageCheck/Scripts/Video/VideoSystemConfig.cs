@@ -9,7 +9,7 @@ namespace RFIDBaggage.Video
     public sealed class VideoSystemConfig : ScriptableObject
     {
         [SerializeField, Tooltip("Idle loop video path relative to StreamingAssets.")]
-        private string idleVideoRelativePath = "Videos/Common/Idle_Loop.mp4";
+        private string idleVideoRelativePath = "LuggageCheck/Videos/Common/Idle_Loop.mp4";
 
         [SerializeField, Min(0.1f), Tooltip("Maximum seconds to wait for VideoPlayer Prepare.")]
         private float prepareTimeout = 10f;

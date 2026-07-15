@@ -15,10 +15,10 @@ MonoBehaviour:
   levelId: Level_03
   displayName: Test Level 03
   rfidId: RFID_03
-  introVideoRelativePath: Videos/Level03/Level03_Intro.mp4
-  successVideoRelativePath: Videos/Level03/Level03_Success.mp4
-  failureVideoRelativePath: Videos/Level03/Level03_Failure.mp4
-  finalFrameImageRelativePath: Images/Level03/Level03_FinalFrame.png
+  introVideoRelativePath: LuggageCheck/Videos/Level03/Level03_Intro.mp4
+  successVideoRelativePath: LuggageCheck/Videos/Level03/Level03_Success.mp4
+  failureVideoRelativePath: LuggageCheck/Videos/Level03/Level03_Failure.mp4
+  finalFrameImageRelativePath: LuggageCheck/Images/Level03/Level03_FinalFrame.png
   successPerformanceLeadTime: 1
   failurePerformanceLeadTime: 1
   levelRoot: {fileID: 0}

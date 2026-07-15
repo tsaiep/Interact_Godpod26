@@ -127,16 +127,16 @@ Assets/StreamingAssets/Videos
 建議格式：
 
 ```text
-Assets/StreamingAssets/Videos/Common/Idle_Loop.mp4
-Assets/StreamingAssets/Videos/Level01/Level01_Intro.mp4
-Assets/StreamingAssets/Videos/Level01/Level01_Success.mp4
-Assets/StreamingAssets/Videos/Level01/Level01_Failure.mp4
+Assets/StreamingAssets/LuggageCheck/Videos/Common/Idle_Loop.mp4
+Assets/StreamingAssets/LuggageCheck/Videos/Level01/Level01_Intro.mp4
+Assets/StreamingAssets/LuggageCheck/Videos/Level01/Level01_Success.mp4
+Assets/StreamingAssets/LuggageCheck/Videos/Level01/Level01_Failure.mp4
 ```
 
 靜態背景圖片放在：
 
 ```text
-Assets/StreamingAssets/Images/Level01/Level01_FinalFrame.png
+Assets/StreamingAssets/LuggageCheck/Images/Level01/Level01_FinalFrame.png
 ```
 
 ## 8. LevelConfig 中影片相對路徑的填寫方式
@@ -144,16 +144,16 @@ Assets/StreamingAssets/Images/Level01/Level01_FinalFrame.png
 在每個 `LevelConfig` asset 中，只填 StreamingAssets 底下的相對路徑：
 
 ```text
-introVideoRelativePath: Videos/Level01/Level01_Intro.mp4
-successVideoRelativePath: Videos/Level01/Level01_Success.mp4
-failureVideoRelativePath: Videos/Level01/Level01_Failure.mp4
-finalFrameImageRelativePath: Images/Level01/Level01_FinalFrame.png
+introVideoRelativePath: LuggageCheck/Videos/Level01/Level01_Intro.mp4
+successVideoRelativePath: LuggageCheck/Videos/Level01/Level01_Success.mp4
+failureVideoRelativePath: LuggageCheck/Videos/Level01/Level01_Failure.mp4
+finalFrameImageRelativePath: LuggageCheck/Images/Level01/Level01_FinalFrame.png
 ```
 
 不要填：
 
 ```text
-C:/UnityProject/Interact_Godpod26/Assets/StreamingAssets/Videos/Level01/Level01_Intro.mp4
+C:/UnityProject/Interact_Godpod26/Assets/StreamingAssets/LuggageCheck/Videos/Level01/Level01_Intro.mp4
 ```
 
 ## 9. 完整路徑與 URI 的建立方式
@@ -279,7 +279,7 @@ Interact_Godpod26_Data/StreamingAssets/Images
 5. 使用含空格或中文檔名測試時，LevelConfig 仍只填相對路徑，例如：
 
 ```text
-Videos/Level01/Level01 Intro 中文.mp4
+LuggageCheck/Videos/Level01/Level01 Intro 中文.mp4
 ```
 
 ## 16. 常見錯誤與排查方式

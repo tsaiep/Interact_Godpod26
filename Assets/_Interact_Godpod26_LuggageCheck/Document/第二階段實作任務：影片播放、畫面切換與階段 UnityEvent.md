@@ -236,28 +236,29 @@ StreamingAssets 建議結構：
 ```text
 Assets/
 └── StreamingAssets/
-    ├── Videos/
-    │   ├── Common/
-    │   │   └── Idle_Loop.mp4
-    │   │
-    │   ├── Level01/
-    │   │   ├── Level01_Intro.mp4
-    │   │   ├── Level01_Success.mp4
-    │   │   └── Level01_Failure.mp4
-    │   │
-    │   ├── Level02/
-    │   │   ├── Level02_Intro.mp4
-    │   │   ├── Level02_Success.mp4
-    │   │   └── Level02_Failure.mp4
-    │   │
-    │   └── ...
-    │
-    └── Images/
-        ├── Level01/
-        │   └── Level01_FinalFrame.png
-        ├── Level02/
-        │   └── Level02_FinalFrame.png
-        └── ...
+    └── LuggageCheck/
+        ├── Videos/
+        │   ├── Common/
+        │   │   └── Idle_Loop.mp4
+        │   │
+        │   ├── Level01/
+        │   │   ├── Level01_Intro.mp4
+        │   │   ├── Level01_Success.mp4
+        │   │   └── Level01_Failure.mp4
+        │   │
+        │   ├── Level02/
+        │   │   ├── Level02_Intro.mp4
+        │   │   ├── Level02_Success.mp4
+        │   │   └── Level02_Failure.mp4
+        │   │
+        │   └── ...
+        │
+        └── Images/
+            ├── Level01/
+            │   └── Level01_FinalFrame.png
+            ├── Level02/
+            │   └── Level02_FinalFrame.png
+            └── ...
 ```
 
 所有資料設定只保存相對路徑。
@@ -470,10 +471,10 @@ string finalFrameImageRelativePath;
 路徑範例：
 
 ```text
-Videos/Level01/Level01_Intro.mp4
-Videos/Level01/Level01_Success.mp4
-Videos/Level01/Level01_Failure.mp4
-Images/Level01/Level01_FinalFrame.png
+LuggageCheck/Videos/Level01/Level01_Intro.mp4
+LuggageCheck/Videos/Level01/Level01_Success.mp4
+LuggageCheck/Videos/Level01/Level01_Failure.mp4
+LuggageCheck/Images/Level01/Level01_FinalFrame.png
 ```
 
 本階段應檢查：
@@ -1404,7 +1405,7 @@ Prepare 逾時：
 
 ```text
 [Video] Prepare timeout:
-Videos/Level01/Level01_Intro.mp4
+LuggageCheck/Videos/Level01/Level01_Intro.mp4
 ```
 
 過期事件：

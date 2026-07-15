@@ -148,9 +148,9 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
+  - {fileID: 761675237}
   - {fileID: 1728322113}
   - {fileID: 441029973}
-  - {fileID: 761675237}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &441029972
@@ -230,6 +230,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 761675237}
+  - component: {fileID: 761675238}
   m_Layer: 0
   m_Name: FlowController
   m_TagString: Untagged
@@ -252,6 +253,51 @@ Transform:
   m_Children: []
   m_Father: {fileID: 313162513}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &761675238
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 761675236}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac9e6f1044484f84b98e7d8f47f65a6e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CabinPortraits.Video.CabinPortraitVideoCycleController
+  sequenceConfig: {fileID: 11400000, guid: ec480c9113dd40dca9a4a4f060d254da, type: 2}
+  videoPlayerA: {fileID: 1728322114}
+  videoPlayerB: {fileID: 441029974}
+  displayController: {fileID: 1665898248}
+  enableKeyboardInput: 0
+  switchKey: 32
+  onSwitchRequested:
+    m_PersistentCalls:
+      m_Calls: []
+  onTransitionStarted:
+    m_PersistentCalls:
+      m_Calls: []
+  onVideoIndexChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  onVideoPrepared:
+    m_PersistentCalls:
+      m_Calls: []
+  onVideoStarted:
+    m_PersistentCalls:
+      m_Calls: []
+  onInputRejected:
+    m_PersistentCalls:
+      m_Calls: []
+  onInputCooldownStarted:
+    m_PersistentCalls:
+      m_Calls: []
+  onInputCooldownEnded:
+    m_PersistentCalls:
+      m_Calls: []
+  onVideoError:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &955379001
 GameObject:
   m_ObjectHideFlags: 0
@@ -513,8 +559,8 @@ MonoBehaviour:
   sharedDisplayRenderer: {fileID: 0}
   playerADisplayRenderer: {fileID: 1678980195}
   playerBDisplayRenderer: {fileID: 955379003}
-  playerATexture: {fileID: 0}
-  playerBTexture: {fileID: 0}
+  playerATexture: {fileID: 2800000, guid: 1c3051fc99b1ea247b7bd15791dd81a7, type: 3}
+  playerBTexture: {fileID: 2800000, guid: 1c3051fc99b1ea247b7bd15791dd81a7, type: 3}
   texturePropertyName: _BaseMap
   alsoSetMainTex: 1
 --- !u!1 &1678980193

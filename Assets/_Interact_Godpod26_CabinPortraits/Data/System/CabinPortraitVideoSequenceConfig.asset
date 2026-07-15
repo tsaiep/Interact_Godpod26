@@ -13,12 +13,12 @@ MonoBehaviour:
   m_Name: CabinPortraitVideoSequenceConfig
   m_EditorClassIdentifier: Assembly-CSharp::CabinPortraits.Video.CabinPortraitVideoSequenceConfig
   videoRelativePaths:
-  - Videos/Interaction02/Video_00.mp4
-  - Videos/Interaction02/Video_01.mp4
-  - Videos/Interaction02/Video_02.mp4
-  - Videos/Interaction02/Video_03.mp4
-  - Videos/Interaction02/Video_04.mp4
-  - Videos/Interaction02/Video_05.mp4
+  - CabinPortraits/Videos/Video_00.mp4
+  - CabinPortraits/Videos/Video_01.mp4
+  - CabinPortraits/Videos/Video_02.mp4
+  - CabinPortraits/Videos/Video_03.mp4
+  - CabinPortraits/Videos/Video_04.mp4
+  - CabinPortraits/Videos/Video_05.mp4
   startIndex: 0
   playOnStart: 1
   prepareTimeout: 10
