@@ -363,7 +363,7 @@ VideoPlayer:
   m_ControlledAudioTrackCount: 1
   m_PlayOnAwake: 0
   m_SkipOnDrop: 1
-  m_Looping: 0
+  m_Looping: 1
   m_WaitForFirstFrame: 1
   m_FrameReadyEventEnabled: 0
   m_VideoShaders: []
@@ -570,7 +570,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &955379002
 Transform:
   m_ObjectHideFlags: 0
@@ -756,8 +756,8 @@ MonoBehaviour:
   sharedDisplayRenderer: {fileID: 0}
   playerADisplayRenderer: {fileID: 1678980195}
   playerBDisplayRenderer: {fileID: 955379003}
-  playerATexture: {fileID: 2800000, guid: 1c3051fc99b1ea247b7bd15791dd81a7, type: 3}
-  playerBTexture: {fileID: 2800000, guid: 1c3051fc99b1ea247b7bd15791dd81a7, type: 3}
+  playerATexture: {fileID: 8400000, guid: f5128065f8574cca925504aa7da50f9b, type: 2}
+  playerBTexture: {fileID: 8400000, guid: 70758a37878a47c3982c279ee557574e, type: 2}
   texturePropertyName: _BaseMap
   alsoSetMainTex: 1
   verboseDisplayLogs: 1
@@ -778,7 +778,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1678980194
 Transform:
   m_ObjectHideFlags: 0
@@ -916,7 +916,7 @@ VideoPlayer:
   m_ControlledAudioTrackCount: 1
   m_PlayOnAwake: 0
   m_SkipOnDrop: 1
-  m_Looping: 0
+  m_Looping: 1
   m_WaitForFirstFrame: 1
   m_FrameReadyEventEnabled: 0
   m_VideoShaders: []

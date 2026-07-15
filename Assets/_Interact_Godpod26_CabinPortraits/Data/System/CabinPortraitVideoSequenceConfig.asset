@@ -22,7 +22,12 @@ MonoBehaviour:
   startIndex: 0
   playOnStart: 1
   prepareTimeout: 10
-  firstFrameTimeout: 5
+  firstFrameTimeout: 10
+  prerollStandbyBeforeSwitch: 1
+  standbyPrerollTimeout: 120
   transitionSwitchDelay: 1
-  inputCooldown: 2
+  hiddenWarmupDuration: 1
+  muteAudioDuringHiddenWarmup: 1
+  prepareNextDelayAfterSwitch: 10
+  inputCooldown: 5
   verboseLogs: 1

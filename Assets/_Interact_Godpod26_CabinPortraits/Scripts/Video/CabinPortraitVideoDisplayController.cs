@@ -41,6 +41,9 @@ namespace CabinPortraits.Video
         private MaterialPropertyBlock sharedPropertyBlock;
         private MaterialPropertyBlock playerAPropertyBlock;
         private MaterialPropertyBlock playerBPropertyBlock;
+        private Texture sharedAssignedTexture;
+        private Texture playerAAssignedTexture;
+        private Texture playerBAssignedTexture;
 
         private int texturePropertyId;
         private static readonly int MainTexPropertyId = Shader.PropertyToID("_MainTex");
@@ -72,19 +75,20 @@ namespace CabinPortraits.Video
 
             if (sharedDisplayRenderer != null)
             {
-                SetRendererTexture(sharedDisplayRenderer, texture, ref sharedPropertyBlock);
+                SetRendererTexture(sharedDisplayRenderer, texture, ref sharedPropertyBlock, ref sharedAssignedTexture);
                 SetVisible(sharedDisplayRenderer, true);
+                SetVisibleIfNotShared(playerADisplayRenderer, false);
+                SetVisibleIfNotShared(playerBDisplayRenderer, false);
             }
-
-            if (playerADisplayRenderer != null || playerBDisplayRenderer != null)
+            else
             {
                 if (slot == CabinPortraitVideoSlot.A)
                 {
-                    SetRendererTexture(playerADisplayRenderer, texture, ref playerAPropertyBlock);
+                    SetRendererTexture(playerADisplayRenderer, texture, ref playerAPropertyBlock, ref playerAAssignedTexture);
                 }
                 else
                 {
-                    SetRendererTexture(playerBDisplayRenderer, texture, ref playerBPropertyBlock);
+                    SetRendererTexture(playerBDisplayRenderer, texture, ref playerBPropertyBlock, ref playerBAssignedTexture);
                 }
 
                 SetVisible(playerADisplayRenderer, slot == CabinPortraitVideoSlot.A);
@@ -96,7 +100,8 @@ namespace CabinPortraits.Video
                 Debug.Log(
                     $"[CabinPortraits.Display] ShowSlot {slot}. Texture={DescribeTexture(texture)}, " +
                     $"Source={(usingFallback ? "fallback" : "runtime")}, Shared={DescribeRenderer(sharedDisplayRenderer)}, " +
-                    $"PlayerA={DescribeRenderer(playerADisplayRenderer)}, PlayerB={DescribeRenderer(playerBDisplayRenderer)}.",
+                    $"PlayerA={DescribeRenderer(playerADisplayRenderer)}, PlayerB={DescribeRenderer(playerBDisplayRenderer)}, " +
+                    $"Mode={(sharedDisplayRenderer != null ? "Shared" : "Separate")}.",
                     this);
             }
         }
@@ -120,8 +125,14 @@ namespace CabinPortraits.Video
 
         private void ApplyConfiguredTextures()
         {
-            SetRendererTexture(playerADisplayRenderer, playerATexture, ref playerAPropertyBlock);
-            SetRendererTexture(playerBDisplayRenderer, playerBTexture, ref playerBPropertyBlock);
+            if (sharedDisplayRenderer != null)
+            {
+                SetRendererTexture(sharedDisplayRenderer, playerATexture, ref sharedPropertyBlock, ref sharedAssignedTexture);
+                return;
+            }
+
+            SetRendererTexture(playerADisplayRenderer, playerATexture, ref playerAPropertyBlock, ref playerAAssignedTexture);
+            SetRendererTexture(playerBDisplayRenderer, playerBTexture, ref playerBPropertyBlock, ref playerBAssignedTexture);
         }
 
         private Texture GetConfiguredTexture(CabinPortraitVideoSlot slot)
@@ -129,7 +140,7 @@ namespace CabinPortraits.Video
             return slot == CabinPortraitVideoSlot.A ? playerATexture : playerBTexture;
         }
 
-        private void SetRendererTexture(Renderer targetRenderer, Texture texture, ref MaterialPropertyBlock propertyBlock)
+        private void SetRendererTexture(Renderer targetRenderer, Texture texture, ref MaterialPropertyBlock propertyBlock, ref Texture assignedTexture)
         {
             if (targetRenderer == null)
             {
@@ -143,6 +154,11 @@ namespace CabinPortraits.Video
                     Debug.LogWarning($"[CabinPortraits.Display] Cannot assign null texture to {targetRenderer.name}.", this);
                 }
 
+                return;
+            }
+
+            if (assignedTexture == texture)
+            {
                 return;
             }
 
@@ -160,6 +176,7 @@ namespace CabinPortraits.Video
             }
 
             targetRenderer.SetPropertyBlock(propertyBlock);
+            assignedTexture = texture;
 
             if (verboseDisplayLogs)
             {
@@ -175,7 +192,16 @@ namespace CabinPortraits.Video
             }
 
             targetRenderer.enabled = visible;
-            targetRenderer.gameObject.SetActive(visible);
+        }
+
+        private void SetVisibleIfNotShared(Renderer targetRenderer, bool visible)
+        {
+            if (targetRenderer == sharedDisplayRenderer)
+            {
+                return;
+            }
+
+            SetVisible(targetRenderer, visible);
         }
 
         private void InitializePropertyIds()

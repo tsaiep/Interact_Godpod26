@@ -7,12 +7,12 @@
 - RenderTexture B: `Assets/_Interact_Godpod26_CabinPortraits/RenderTextures/RT_CabinPortraitB.renderTexture`
 - Expected video folder: `Assets/StreamingAssets/CabinPortraits/Videos/`
 - Default files:
-  - `Video_00.mp4`
   - `Video_01.mp4`
   - `Video_02.mp4`
   - `Video_03.mp4`
   - `Video_04.mp4`
   - `Video_05.mp4`
+  - `Video_06.mp4`
 
 ## Scene Object Layout
 
@@ -48,9 +48,12 @@ SceneRoot
    - Target Texture: `RT_CabinPortraitB`
 
 3. Add `CabinPortraitVideoDisplayController` to `VideoDisplay`.
-   - For a single display mesh, assign `Shared Display Renderer`.
-   - For two display meshes, assign `Player A Display Renderer` and `Player B Display Renderer`.
+   - Leave `Shared Display Renderer` empty for the recommended A/B renderer flow.
+   - Assign `Player A Display Renderer` to the mesh that displays `RT_CabinPortraitA`.
+   - Assign `Player B Display Renderer` to the mesh that displays `RT_CabinPortraitB`.
    - Assign fallback textures `RT_CabinPortraitA` and `RT_CabinPortraitB`.
+   - Keep both display GameObjects active. The controller switches visibility with `Renderer.enabled` so each renderer keeps its own RenderTexture binding.
+   - Only use `Shared Display Renderer` when you intentionally want a single mesh whose texture is swapped at runtime.
    - If Console logs say `Source=fallback`, the active VideoPlayer did not provide a runtime texture. Check its Target Texture and Render Mode.
 
 4. Add `CabinPortraitVideoCycleController` to `FlowController`.
@@ -69,20 +72,28 @@ SceneRoot
 
 ## Runtime Flow
 
-On Start, the controller prepares index `0` on player A, prepares index `1` on player B, and plays index `0` when its first frame is ready.
+On Start, the controller prepares and plays the start index on player A. After the first video is visible, player B prepares the next index. If `Preroll Standby Before Switch` is enabled, player B plays the next video hidden and muted through one full loop, rewinds to the start, pauses, and only then enters `ReadyForSwitch`.
 
 When Space is accepted:
 
 ```text
 invoke On Switch Requested
 invoke On Transition Started
-wait transitionSwitchDelay
-show prepared next player
-stop old player
-prepare following index on old player
+wait Transition Switch Delay
+play prepared standby player hidden behind the fully covered transition
+wait Hidden Warmup Duration
+show standby player by enabling its dedicated renderer
+invoke On Ready To Reveal
+pause old active player
+swap active and standby players
+wait Prepare Next Delay After Switch
+stop old active player and prepare the following index on it
+hidden full pre-roll the following index on the standby player
 wait remaining inputCooldown
 accept Space again
 ```
+
+This is the A/B double-buffer flow used like the LuggageCheck idle-to-intro path with an extra hidden warm-up stage. While one player is visible, the other player is prepared, played hidden through its first complete loop, rewound to the start, and paused. On switch, the current video continues while the transition covers the display. After `Transition Switch Delay`, the fully pre-rolled standby player starts playing hidden for `Hidden Warmup Duration`. Only after that warm-up does the display switch by disabling the old renderer and enabling the new renderer, then invoke `On Ready To Reveal`, which should start revealing the mask. The old player is paused after the display switch, then stopped/prepared later so it does not compete with the first visible seconds of the new video.
 
 The index loops as:
 
