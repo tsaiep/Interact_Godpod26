@@ -25,4 +25,5 @@ MonoBehaviour:
   firstFrameWarningTimeout: 10
   transitionCoverDelay: 1
   switchInputCooldown: 10
+  autoSwitchInterval: 20
   verboseLogs: 1

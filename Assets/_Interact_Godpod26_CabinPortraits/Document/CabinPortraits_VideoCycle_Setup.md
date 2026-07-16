@@ -63,6 +63,7 @@ SceneRoot
    - Display Controller: `VideoDisplay`
    - Keyboard Input: enabled
    - Switch Key: `Space` or `Enter`
+   - `Auto Switch Interval`: seconds between automatic switch requests while the video is playing. Set to `0` to disable automatic switching.
 
 5. Use the Unity Events on `CabinPortraitVideoCycleController` to trigger transition visuals.
    - `On Switch Requested`: accepted Space input.
@@ -91,6 +92,8 @@ accept Space again
 ```
 
 This keeps the visible playback path clean: while a video is visible, no other VideoPlayer is preparing, pre-rolling, seeking, or decoding in the background. The old video continues during `Transition Cover Delay`; once the transition should fully cover the display, the old player is stopped and the next player is prepared under the mask. `Prepare Warning Timeout` and `First Frame Warning Timeout` only print warnings and continue waiting; they do not enter `ErrorRecovery`. `Switch Input Cooldown` only delays input unlock after the video switch has completed, so it does not delay video prepare or playback.
+
+If `Auto Switch Interval` is greater than `0`, the controller automatically requests the same switch flow after that many seconds in `ActivePlaying`. A successful manual switch resets the automatic timer. Automatic switching is skipped while input is locked, while a switch is already running, or outside `ActivePlaying`.
 
 The index loops as:
 

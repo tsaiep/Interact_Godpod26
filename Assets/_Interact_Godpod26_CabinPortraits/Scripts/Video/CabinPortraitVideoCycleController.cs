@@ -142,6 +142,8 @@ namespace CabinPortraits.Video
         private bool initialized;
         private bool inputLocked;
         private bool isSwitching;
+        private float nextAutoSwitchAt = -1f;
+        private float lastAutoSwitchInterval = -1f;
 
         public int CurrentIndex => currentIndex;
         public FlowState CurrentState => currentState;
@@ -175,8 +177,13 @@ namespace CabinPortraits.Video
         {
             if (enableKeyboardInput && IsSwitchKeyDown())
             {
-                RequestNextVideo();
+                if (RequestNextVideo())
+                {
+                    return;
+                }
             }
+
+            UpdateAutoSwitch();
         }
 
         private bool IsSwitchKeyDown()
@@ -219,6 +226,8 @@ namespace CabinPortraits.Video
             initialized = true;
             inputLocked = true;
             isSwitching = false;
+            nextAutoSwitchAt = -1f;
+            lastAutoSwitchInterval = -1f;
             currentIndex = -1;
             activeSlot = slotAState;
             inactiveSlot = slotBState;
@@ -255,6 +264,8 @@ namespace CabinPortraits.Video
             initialized = false;
             inputLocked = false;
             isSwitching = false;
+            nextAutoSwitchAt = -1f;
+            lastAutoSwitchInterval = -1f;
             currentIndex = -1;
             currentState = FlowState.SystemInitializing;
             StopCoroutineIfRunning(ref startupCoroutine);
@@ -293,6 +304,7 @@ namespace CabinPortraits.Video
             currentIndex = activeSlot.VideoIndex;
             onVideoIndexChanged.Invoke(currentIndex);
             TransitionTo(FlowState.ActivePlaying);
+            ScheduleNextAutoSwitch();
             UnlockInput();
             startupCoroutine = null;
         }
@@ -362,6 +374,7 @@ namespace CabinPortraits.Video
             isSwitching = false;
             yield return WaitForRemainingSwitchCooldown(acceptedAt);
             UnlockInput();
+            ScheduleNextAutoSwitch();
             switchCoroutine = null;
         }
 
@@ -374,6 +387,55 @@ namespace CabinPortraits.Video
             {
                 yield return new WaitForSecondsRealtime(remaining);
             }
+        }
+
+        private void UpdateAutoSwitch()
+        {
+            if (sequenceConfig == null || sequenceConfig.AutoSwitchInterval <= 0f)
+            {
+                nextAutoSwitchAt = -1f;
+                lastAutoSwitchInterval = -1f;
+                return;
+            }
+
+            if (!initialized || currentState != FlowState.ActivePlaying || inputLocked || isSwitching)
+            {
+                return;
+            }
+
+            if (!Mathf.Approximately(lastAutoSwitchInterval, sequenceConfig.AutoSwitchInterval) || nextAutoSwitchAt < 0f)
+            {
+                ScheduleNextAutoSwitch();
+                return;
+            }
+
+            if (Time.unscaledTime < nextAutoSwitchAt)
+            {
+                return;
+            }
+
+            if (ShouldLog)
+            {
+                Debug.Log($"[CabinPortraits.Video] Auto switch interval reached after {sequenceConfig.AutoSwitchInterval:0.##} seconds.", this);
+            }
+
+            if (!RequestNextVideo())
+            {
+                ScheduleNextAutoSwitch();
+            }
+        }
+
+        private void ScheduleNextAutoSwitch()
+        {
+            if (sequenceConfig == null || sequenceConfig.AutoSwitchInterval <= 0f)
+            {
+                nextAutoSwitchAt = -1f;
+                lastAutoSwitchInterval = -1f;
+                return;
+            }
+
+            lastAutoSwitchInterval = sequenceConfig.AutoSwitchInterval;
+            nextAutoSwitchAt = Time.unscaledTime + sequenceConfig.AutoSwitchInterval;
         }
 
         private bool CanAcceptSwitchRequest(out string rejectionReason)
