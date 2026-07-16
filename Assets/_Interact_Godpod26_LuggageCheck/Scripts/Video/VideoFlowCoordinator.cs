@@ -34,6 +34,7 @@ namespace RFIDBaggage.Video
         private UnityEvent onFailurePerformanceCue = new UnityEvent();
 
         private LevelConfig currentLevel;
+        private Coroutine idleLoopSignalToIntroDelayCoroutine;
         private Coroutine resultPrepareDelayCoroutine;
         private Coroutine resultPerformanceCueCoroutine;
 
@@ -68,6 +69,7 @@ namespace RFIDBaggage.Video
 
             StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
             StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
+            StopCoroutineIfRunning(ref idleLoopSignalToIntroDelayCoroutine);
         }
 
         private void HandleStateChanged(GameState previousState, GameState nextState)
@@ -128,6 +130,7 @@ namespace RFIDBaggage.Video
         {
             currentLevel = gameFlowManager.CurrentLevel;
 
+            StopCoroutineIfRunning(ref idleLoopSignalToIntroDelayCoroutine);
             StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
             if (streamingImageLoader != null)
             {
@@ -145,7 +148,40 @@ namespace RFIDBaggage.Video
                 return;
             }
 
-            gameFlowManager.NotifyLevelInitialized();
+            ScheduleIntroAfterIdleSignalDelay();
+        }
+
+        private void ScheduleIntroAfterIdleSignalDelay()
+        {
+            float delay = videoSystemConfig != null
+                ? videoSystemConfig.IdleLoopSignalToIntroDelay
+                : 0f;
+
+            if (delay <= 0f)
+            {
+                gameFlowManager.NotifyLevelInitialized();
+                return;
+            }
+
+            idleLoopSignalToIntroDelayCoroutine = StartCoroutine(IdleLoopSignalToIntroDelayRoutine(delay));
+        }
+
+        private IEnumerator IdleLoopSignalToIntroDelayRoutine(float delay)
+        {
+            float startTime = Time.unscaledTime;
+
+            while (gameFlowManager.CurrentState == GameState.LevelInitializing &&
+                   Time.unscaledTime - startTime < delay)
+            {
+                yield return null;
+            }
+
+            idleLoopSignalToIntroDelayCoroutine = null;
+
+            if (gameFlowManager.CurrentState == GameState.LevelInitializing)
+            {
+                gameFlowManager.NotifyLevelInitialized();
+            }
         }
 
         private void PrepareIntro()
@@ -278,6 +314,7 @@ namespace RFIDBaggage.Video
 
         private void ResetVideoFlow()
         {
+            StopCoroutineIfRunning(ref idleLoopSignalToIntroDelayCoroutine);
             StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
             StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
             if (streamingImageLoader != null)
