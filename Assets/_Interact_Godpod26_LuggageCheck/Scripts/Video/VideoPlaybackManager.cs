@@ -54,6 +54,12 @@ namespace RFIDBaggage.Video
             public bool FirstFrameReceived;
             public bool CompletionReported;
             public bool Loop;
+            public bool PrimingAudioMuted;
+            public bool PrimingDirectAudioWasMuted;
+            public VideoAudioOutputMode PrimingAudioOutputMode;
+            public AudioSource PrimingAudioSource;
+            public bool PrimingAudioSourceWasMuted;
+            public long FirstFrameIndex = -1;
             public VideoContentType ContentType = VideoContentType.None;
             public string RelativePath = string.Empty;
             public string FullPath = string.Empty;
@@ -97,6 +103,7 @@ namespace RFIDBaggage.Video
         {
             UnsubscribeAll();
             StopAllCoroutinesForStates();
+            RestorePrimingAudioForStates();
         }
 
         public void PrepareIdle(string relativePath)
@@ -156,6 +163,7 @@ namespace RFIDBaggage.Video
             IsPreparing = true;
 
             ConfigurePlayer(state.Player, loop);
+            RestorePrimingAudio(state);
             state.Player.Stop();
             state.Player.url = fileUri;
 
@@ -326,6 +334,8 @@ namespace RFIDBaggage.Video
                 standbyContentState = GetOtherContentState(state);
             }
 
+            RestorePrimingAudio(state);
+            state.Player.sendFrameReadyEvents = false;
             state.Player.Play();
 
             if (ShouldLog)
@@ -440,6 +450,7 @@ namespace RFIDBaggage.Video
             state.IsPreparing = true;
             state.IsPlaying = false;
             state.FirstFrameReceived = false;
+            state.FirstFrameIndex = -1;
             state.CompletionReported = false;
             state.ContentType = contentType;
             state.RelativePath = relativePath;
@@ -454,6 +465,7 @@ namespace RFIDBaggage.Video
             player.playOnAwake = false;
             player.waitForFirstFrame = true;
             player.isLooping = loop;
+            player.skipOnDrop = false;
             player.sendFrameReadyEvents = true;
         }
 
@@ -543,24 +555,19 @@ namespace RFIDBaggage.Video
             float start = Time.unscaledTime;
             VideoPlayer player = state.Player;
 
-            if (player != null && player.canStep)
+            if (player != null)
             {
-                player.StepForward();
-            }
+                ApplyPrimingAudioMute(state);
+                player.sendFrameReadyEvents = true;
 
-            if (player != null && !player.isPlaying)
-            {
-                player.Play();
+                if (!player.isPlaying)
+                {
+                    player.Play();
+                }
             }
 
             while (state.Token == token && state.IsPreparing && !state.FirstFrameReceived && Time.unscaledTime - start < timeout)
             {
-                if (player != null && player.frame >= 0 && player.texture != null && player.texture.width > 0 && player.texture.height > 0)
-                {
-                    state.FirstFrameReceived = true;
-                    break;
-                }
-
                 yield return null;
             }
 
@@ -584,7 +591,10 @@ namespace RFIDBaggage.Video
             }
 
             state.IsPreparing = false;
-            state.Player.sendFrameReadyEvents = false;
+            if (state.Player != null)
+            {
+                state.Player.sendFrameReadyEvents = false;
+            }
             IsPreparing = false;
             PreparingContentType = VideoContentType.None;
             PreparedContentType = state.ContentType;
@@ -592,7 +602,8 @@ namespace RFIDBaggage.Video
 
             if (ShouldLog)
             {
-                Debug.Log($"[Video] {state.ContentType} first frame ready on {player.name}.", this);
+                string playerName = player != null ? player.name : "<missing>";
+                Debug.Log($"[Video] {state.ContentType} first frame ready on {playerName}. Frame: {state.FirstFrameIndex}.", this);
             }
 
             FirstFrameReady?.Invoke(state.ContentType);
@@ -607,8 +618,18 @@ namespace RFIDBaggage.Video
                 return;
             }
 
+            if (state.FirstFrameReceived)
+            {
+                return;
+            }
+
             state.FirstFrameReceived = true;
-            player.sendFrameReadyEvents = false;
+            state.FirstFrameIndex = frameIdx;
+
+            if (player != null && player.isPlaying)
+            {
+                player.Pause();
+            }
         }
 
         private void HandleLoopPointReached(VideoPlayer player)
@@ -700,13 +721,103 @@ namespace RFIDBaggage.Video
                 return;
             }
 
+            RestorePrimingAudio(state);
             state.Player.sendFrameReadyEvents = false;
             state.Player.Stop();
             state.IsPreparing = false;
             state.IsPlaying = false;
             state.FirstFrameReceived = false;
+            state.FirstFrameIndex = -1;
             state.CompletionReported = false;
             state.ContentType = VideoContentType.None;
+        }
+
+        private void ApplyPrimingAudioMute(PlayerState state)
+        {
+            if (state == null || state.Player == null || state.PrimingAudioMuted)
+            {
+                return;
+            }
+
+            VideoPlayer player = state.Player;
+            state.PrimingAudioOutputMode = player.audioOutputMode;
+
+            try
+            {
+                if (player.audioOutputMode == VideoAudioOutputMode.Direct)
+                {
+                    state.PrimingDirectAudioWasMuted = player.GetDirectAudioMute(0);
+                    player.SetDirectAudioMute(0, true);
+                    state.PrimingAudioMuted = true;
+                    return;
+                }
+
+                if (player.audioOutputMode == VideoAudioOutputMode.AudioSource && player.controlledAudioTrackCount > 0)
+                {
+                    AudioSource audioSource = player.GetTargetAudioSource(0);
+                    if (audioSource == null)
+                    {
+                        return;
+                    }
+
+                    state.PrimingAudioSource = audioSource;
+                    state.PrimingAudioSourceWasMuted = audioSource.mute;
+                    audioSource.mute = true;
+                    state.PrimingAudioMuted = true;
+                }
+            }
+            catch (Exception exception)
+            {
+                if (ShouldLog)
+                {
+                    Debug.LogWarning($"[Video] Could not mute priming audio for {state.ContentType} on {player.name}: {exception.Message}", this);
+                }
+            }
+        }
+
+        private void RestorePrimingAudio(PlayerState state)
+        {
+            if (state == null || !state.PrimingAudioMuted)
+            {
+                return;
+            }
+
+            VideoPlayer player = state.Player;
+
+            try
+            {
+                if (player != null && state.PrimingAudioOutputMode == VideoAudioOutputMode.Direct)
+                {
+                    player.SetDirectAudioMute(0, state.PrimingDirectAudioWasMuted);
+                }
+
+                if (state.PrimingAudioSource != null)
+                {
+                    state.PrimingAudioSource.mute = state.PrimingAudioSourceWasMuted;
+                }
+            }
+            catch (Exception exception)
+            {
+                if (ShouldLog)
+                {
+                    string playerName = player != null ? player.name : "<missing>";
+                    Debug.LogWarning($"[Video] Could not restore priming audio for {state.ContentType} on {playerName}: {exception.Message}", this);
+                }
+            }
+            finally
+            {
+                state.PrimingAudioMuted = false;
+                state.PrimingDirectAudioWasMuted = false;
+                state.PrimingAudioSource = null;
+                state.PrimingAudioSourceWasMuted = false;
+            }
+        }
+
+        private void RestorePrimingAudioForStates()
+        {
+            RestorePrimingAudio(idleState);
+            RestorePrimingAudio(contentAState);
+            RestorePrimingAudio(contentBState);
         }
 
         private void StopContentStateIfInactive(PlayerState state)
