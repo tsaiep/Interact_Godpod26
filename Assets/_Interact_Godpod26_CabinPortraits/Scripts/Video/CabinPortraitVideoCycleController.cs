@@ -23,6 +23,62 @@ namespace CabinPortraits.Video
     {
     }
 
+    [Serializable]
+    public sealed class CabinPortraitFlowStateEvent : UnityEvent<CabinPortraitVideoCycleController.FlowState>
+    {
+    }
+
+    [Serializable]
+    public sealed class CabinPortraitFlowStateEvents
+    {
+        [SerializeField] private CabinPortraitFlowStateEvent onStateEntered = new CabinPortraitFlowStateEvent();
+        [SerializeField] private UnityEvent onSystemInitializingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onActivePreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onActivePlayingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onSwitchingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onCoveredPreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onErrorRecoveryEntered = new UnityEvent();
+
+        public void Invoke(CabinPortraitVideoCycleController.FlowState state, UnityEngine.Object context)
+        {
+            InvokeSafely(() => onStateEntered.Invoke(state), $"onStateEntered({state})", context);
+
+            switch (state)
+            {
+                case CabinPortraitVideoCycleController.FlowState.SystemInitializing:
+                    InvokeSafely(onSystemInitializingEntered.Invoke, nameof(onSystemInitializingEntered), context);
+                    break;
+                case CabinPortraitVideoCycleController.FlowState.ActivePreparing:
+                    InvokeSafely(onActivePreparingEntered.Invoke, nameof(onActivePreparingEntered), context);
+                    break;
+                case CabinPortraitVideoCycleController.FlowState.ActivePlaying:
+                    InvokeSafely(onActivePlayingEntered.Invoke, nameof(onActivePlayingEntered), context);
+                    break;
+                case CabinPortraitVideoCycleController.FlowState.Switching:
+                    InvokeSafely(onSwitchingEntered.Invoke, nameof(onSwitchingEntered), context);
+                    break;
+                case CabinPortraitVideoCycleController.FlowState.CoveredPreparing:
+                    InvokeSafely(onCoveredPreparingEntered.Invoke, nameof(onCoveredPreparingEntered), context);
+                    break;
+                case CabinPortraitVideoCycleController.FlowState.ErrorRecovery:
+                    InvokeSafely(onErrorRecoveryEntered.Invoke, nameof(onErrorRecoveryEntered), context);
+                    break;
+            }
+        }
+
+        private static void InvokeSafely(Action action, string eventName, UnityEngine.Object context)
+        {
+            try
+            {
+                action.Invoke();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new Exception($"[CabinPortraits.Flow] UnityEvent failed: {eventName}", exception), context);
+            }
+        }
+    }
+
     public enum CabinPortraitSwitchKey
     {
         Space,
@@ -109,6 +165,9 @@ namespace CabinPortraits.Video
         private UnityEvent onInputUnlocked = new UnityEvent();
 
         [SerializeField] private CabinPortraitVideoMessageEvent onVideoError = new CabinPortraitVideoMessageEvent();
+
+        [SerializeField, Tooltip("Invoked after entering a flow state. Includes one generic state event and one event per state.")]
+        private CabinPortraitFlowStateEvents stateEvents = new CabinPortraitFlowStateEvents();
 
         private sealed class PlayerSlotState
         {
@@ -231,7 +290,7 @@ namespace CabinPortraits.Video
             currentIndex = -1;
             activeSlot = slotAState;
             inactiveSlot = slotBState;
-            currentState = FlowState.SystemInitializing;
+            EnterStateDirectly(FlowState.SystemInitializing);
 
             onInputLocked.Invoke();
             startupCoroutine = StartCoroutine(InitializeAndPlayRoutine());
@@ -267,7 +326,7 @@ namespace CabinPortraits.Video
             nextAutoSwitchAt = -1f;
             lastAutoSwitchInterval = -1f;
             currentIndex = -1;
-            currentState = FlowState.SystemInitializing;
+            EnterStateDirectly(FlowState.SystemInitializing);
             StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
             StopSlot(slotAState);
@@ -890,7 +949,24 @@ namespace CabinPortraits.Video
             currentState = nextState;
             Debug.Log($"[CabinPortraits.Flow] {previousState} -> {nextState}", this);
             InvokeStateChanged(previousState, nextState);
+            InvokeStateEntered(nextState);
             return true;
+        }
+
+        private void EnterStateDirectly(FlowState nextState)
+        {
+            currentState = nextState;
+            InvokeStateEntered(nextState);
+        }
+
+        private void InvokeStateEntered(FlowState state)
+        {
+            if (stateEvents == null)
+            {
+                return;
+            }
+
+            stateEvents.Invoke(state, this);
         }
 
         private void InvokeStateChanged(FlowState previousState, FlowState nextState)
