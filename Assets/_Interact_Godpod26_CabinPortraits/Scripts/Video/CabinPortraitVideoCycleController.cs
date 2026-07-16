@@ -185,6 +185,12 @@ namespace CabinPortraits.Video
             public bool IsReady;
             public bool IsPlaying;
             public bool FirstFrameReceived;
+            public bool PrimingAudioMuted;
+            public bool PrimingDirectAudioWasMuted;
+            public VideoAudioOutputMode PrimingAudioOutputMode;
+            public AudioSource PrimingAudioSource;
+            public bool PrimingAudioSourceWasMuted;
+            public long FirstFrameIndex = -1;
             public string RelativePath = string.Empty;
             public string FullPath = string.Empty;
             public string Url = string.Empty;
@@ -263,6 +269,7 @@ namespace CabinPortraits.Video
             Unsubscribe(videoPlayerB);
             StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
+            RestorePrimingAudioForSlots();
         }
 
         private void OnValidate()
@@ -570,23 +577,22 @@ namespace CabinPortraits.Video
                 yield break;
             }
 
-            SetSlotAudioMuted(state, true);
-
-            if (player.canStep)
+            if (player != null)
             {
-                player.StepForward();
-            }
+                ApplyPrimingAudioMute(state);
+                player.sendFrameReadyEvents = true;
 
-            if (!player.isPlaying)
-            {
-                player.Play();
+                if (!player.isPlaying)
+                {
+                    player.Play();
+                }
             }
 
             float firstFrameWarningTimeout = sequenceConfig != null ? sequenceConfig.FirstFrameWarningTimeout : 5f;
             float firstFrameStartedAt = Time.unscaledTime;
             bool firstFrameWarningLogged = false;
 
-            while (state.Token == token && state.IsPreparing && !HasFirstFrame(player))
+            while (state.Token == token && state.IsPreparing && !state.FirstFrameReceived)
             {
                 if (!firstFrameWarningLogged && Time.unscaledTime - firstFrameStartedAt >= firstFrameWarningTimeout)
                 {
@@ -613,14 +619,13 @@ namespace CabinPortraits.Video
             state.IsPreparing = false;
             state.IsReady = true;
             state.IsPlaying = false;
-            state.FirstFrameReceived = true;
             onVideoPrepared.Invoke(state.VideoIndex);
 
             if (ShouldLog)
             {
                 Debug.Log(
                     $"[CabinPortraits.Video] First frame ready for index {state.VideoIndex} on Player {state.Slot}. " +
-                    $"Frame={player.frame}, Time={player.time:0.###}, TargetTexture={DescribeTexture(player.targetTexture)}, PlayerTexture={DescribeTexture(player.texture)}.",
+                    $"FrameReady={state.FirstFrameIndex}, PlayerFrame={player.frame}, Time={player.time:0.###}, TargetTexture={DescribeTexture(player.targetTexture)}, PlayerTexture={DescribeTexture(player.texture)}.",
                     this);
             }
         }
@@ -662,12 +667,13 @@ namespace CabinPortraits.Video
             state.IsReady = false;
             state.IsPlaying = false;
             state.FirstFrameReceived = false;
+            state.FirstFrameIndex = -1;
             state.RelativePath = relativePath;
             state.FullPath = fullPath;
             state.Url = fileUri;
 
             ConfigurePlayer(state.Player);
-            SetSlotAudioMuted(state, true);
+            RestorePrimingAudio(state);
             state.Player.url = fileUri;
             state.Player.Prepare();
 
@@ -691,8 +697,9 @@ namespace CabinPortraits.Video
                 return false;
             }
 
-            SetSlotAudioMuted(state, false);
+            RestorePrimingAudio(state);
             state.Player.isLooping = true;
+            state.Player.sendFrameReadyEvents = false;
 
             if (!state.Player.isPlaying)
             {
@@ -725,55 +732,8 @@ namespace CabinPortraits.Video
             player.playOnAwake = false;
             player.waitForFirstFrame = true;
             player.isLooping = true;
-            player.sendFrameReadyEvents = false;
-        }
-
-        private static bool HasFirstFrame(VideoPlayer player)
-        {
-            return player != null &&
-                   player.frame >= 0 &&
-                   player.texture != null &&
-                   player.texture.width > 0 &&
-                   player.texture.height > 0;
-        }
-
-        private void SetSlotAudioMuted(PlayerSlotState state, bool muted)
-        {
-            if (state == null || state.Player == null)
-            {
-                return;
-            }
-
-            VideoPlayer player = state.Player;
-            int trackCount = Mathf.Max(1, (int)player.controlledAudioTrackCount);
-
-            for (ushort trackIndex = 0; trackIndex < trackCount; trackIndex++)
-            {
-                try
-                {
-                    if (player.audioOutputMode == VideoAudioOutputMode.AudioSource)
-                    {
-                        AudioSource audioSource = player.GetTargetAudioSource(trackIndex);
-                        if (audioSource != null)
-                        {
-                            audioSource.mute = muted;
-                        }
-                    }
-                    else if (player.audioOutputMode == VideoAudioOutputMode.Direct)
-                    {
-                        player.SetDirectAudioMute(trackIndex, muted);
-                    }
-                }
-                catch (Exception exception)
-                {
-                    if (ShouldLog)
-                    {
-                        Debug.LogWarning($"[CabinPortraits.Video] Failed to set audio mute={muted} on Player {state.Slot}, track {trackIndex}. {exception.Message}", this);
-                    }
-
-                    break;
-                }
-            }
+            player.skipOnDrop = false;
+            player.sendFrameReadyEvents = true;
         }
 
         private void StopSlot(PlayerSlotState state)
@@ -787,7 +747,7 @@ namespace CabinPortraits.Video
 
             if (state.Player != null)
             {
-                SetSlotAudioMuted(state, false);
+                RestorePrimingAudio(state);
                 state.Player.sendFrameReadyEvents = false;
                 state.Player.Stop();
             }
@@ -796,10 +756,97 @@ namespace CabinPortraits.Video
             state.IsReady = false;
             state.IsPlaying = false;
             state.FirstFrameReceived = false;
+            state.FirstFrameIndex = -1;
             state.VideoIndex = -1;
             state.RelativePath = string.Empty;
             state.FullPath = string.Empty;
             state.Url = string.Empty;
+        }
+
+        private void ApplyPrimingAudioMute(PlayerSlotState state)
+        {
+            if (state == null || state.Player == null || state.PrimingAudioMuted)
+            {
+                return;
+            }
+
+            VideoPlayer player = state.Player;
+            state.PrimingAudioOutputMode = player.audioOutputMode;
+
+            try
+            {
+                if (player.audioOutputMode == VideoAudioOutputMode.Direct)
+                {
+                    state.PrimingDirectAudioWasMuted = player.GetDirectAudioMute(0);
+                    player.SetDirectAudioMute(0, true);
+                    state.PrimingAudioMuted = true;
+                    return;
+                }
+
+                if (player.audioOutputMode == VideoAudioOutputMode.AudioSource && player.controlledAudioTrackCount > 0)
+                {
+                    AudioSource audioSource = player.GetTargetAudioSource(0);
+                    if (audioSource == null)
+                    {
+                        return;
+                    }
+
+                    state.PrimingAudioSource = audioSource;
+                    state.PrimingAudioSourceWasMuted = audioSource.mute;
+                    audioSource.mute = true;
+                    state.PrimingAudioMuted = true;
+                }
+            }
+            catch (Exception exception)
+            {
+                if (ShouldLog)
+                {
+                    Debug.LogWarning($"[CabinPortraits.Video] Could not mute priming audio for Player {state.Slot}, index {state.VideoIndex}: {exception.Message}", this);
+                }
+            }
+        }
+
+        private void RestorePrimingAudio(PlayerSlotState state)
+        {
+            if (state == null || !state.PrimingAudioMuted)
+            {
+                return;
+            }
+
+            VideoPlayer player = state.Player;
+
+            try
+            {
+                if (player != null && state.PrimingAudioOutputMode == VideoAudioOutputMode.Direct)
+                {
+                    player.SetDirectAudioMute(0, state.PrimingDirectAudioWasMuted);
+                }
+
+                if (state.PrimingAudioSource != null)
+                {
+                    state.PrimingAudioSource.mute = state.PrimingAudioSourceWasMuted;
+                }
+            }
+            catch (Exception exception)
+            {
+                if (ShouldLog)
+                {
+                    Debug.LogWarning($"[CabinPortraits.Video] Could not restore priming audio for Player {state.Slot}, index {state.VideoIndex}: {exception.Message}", this);
+                }
+            }
+            finally
+            {
+                state.PrimingAudioMuted = false;
+                state.PrimingDirectAudioWasMuted = false;
+                state.PrimingAudioSource = null;
+                state.PrimingAudioSourceWasMuted = false;
+            }
+        }
+
+        private void RestorePrimingAudioForSlots()
+        {
+            RestorePrimingAudio(slotAState);
+            RestorePrimingAudio(slotBState);
         }
 
         private void ReportFailure(string message)
@@ -893,7 +940,10 @@ namespace CabinPortraits.Video
             }
 
             player.errorReceived -= HandleErrorReceived;
+            player.frameReady -= HandleFrameReady;
+
             player.errorReceived += HandleErrorReceived;
+            player.frameReady += HandleFrameReady;
         }
 
         private void Unsubscribe(VideoPlayer player)
@@ -904,6 +954,7 @@ namespace CabinPortraits.Video
             }
 
             player.errorReceived -= HandleErrorReceived;
+            player.frameReady -= HandleFrameReady;
         }
 
         private void HandleErrorReceived(VideoPlayer player, string message)
@@ -914,6 +965,23 @@ namespace CabinPortraits.Video
                 : "Unknown player";
 
             ReportFailure($"VideoPlayer error: {message}\n{context}");
+        }
+
+        private void HandleFrameReady(VideoPlayer player, long frameIndex)
+        {
+            PlayerSlotState state = GetState(player);
+            if (state == null || !state.IsPreparing || state.FirstFrameReceived)
+            {
+                return;
+            }
+
+            state.FirstFrameReceived = true;
+            state.FirstFrameIndex = frameIndex;
+
+            if (player != null && player.isPlaying)
+            {
+                player.Pause();
+            }
         }
 
         private bool HasRequiredReferences()
