@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using RFIDBaggage.Core;
 using UnityEngine;
 
 namespace RFIDBaggage.Selection
@@ -21,6 +22,8 @@ namespace RFIDBaggage.Selection
 
         [SerializeField, Tooltip("When enabled, logs selection movement.")]
         private bool logSelectionMoves = true;
+
+        private GameFlowConfirmKey confirmKey = GameFlowConfirmKey.Space;
 
         private readonly List<SelectableItem> items = new List<SelectableItem>();
         private float navigationCooldown;
@@ -58,7 +61,7 @@ namespace RFIDBaggage.Selection
                 MoveSelection(Vector2.right);
             }
 
-            if (UnityEngine.Input.GetKeyDown(KeyCode.Space))
+            if (GameFlowManager.IsConfirmKeyDown(confirmKey))
             {
                 ConfirmCurrentSelection();
             }
@@ -119,6 +122,11 @@ namespace RFIDBaggage.Selection
                 : FindFirstValidItem();
 
             SetCurrentSelection(initialItem);
+        }
+
+        public void SetConfirmKey(GameFlowConfirmKey key)
+        {
+            confirmKey = key;
         }
 
         public void MoveSelection(Vector2 direction)

@@ -11,6 +11,12 @@ namespace RFIDBaggage.Core
     {
     }
 
+    public enum GameFlowConfirmKey
+    {
+        Space,
+        Enter
+    }
+
     [Serializable]
     public sealed class GameFlowStateEvents
     {
@@ -122,6 +128,10 @@ namespace RFIDBaggage.Core
         [SerializeField, Tooltip("When enabled, the flow automatically enters Idle on Start.")]
         private bool enterIdleOnStart = true;
 
+        [Header("Input")]
+        [SerializeField, Tooltip("Key used to confirm gameplay selections. Enter accepts both Return and Keypad Enter.")]
+        private GameFlowConfirmKey confirmKey = GameFlowConfirmKey.Space;
+
         [Header("Runtime Debug")]
         [SerializeField, Tooltip("All flow states for Inspector display only. This list is not used to drive state transitions.")]
         private GameState[] visibleStateSequence = (GameState[])StateSequence.Clone();
@@ -140,12 +150,30 @@ namespace RFIDBaggage.Core
         public IReadOnlyList<GameState> AllStates => ReadOnlyStateSequence;
         public GameState CurrentState => currentState;
         public LevelConfig CurrentLevel => currentLevel;
+        public GameFlowConfirmKey ConfirmKey => confirmKey;
 
         public event Action<GameState, GameState> StateChanged;
         public event Action<LevelConfig> LevelStarted;
         public event Action<LevelConfig> GameplayStarted;
         public event Action<LevelConfig, bool> LevelFinished;
         public event Action LevelReset;
+
+        public bool IsConfirmKeyDown()
+        {
+            return IsConfirmKeyDown(confirmKey);
+        }
+
+        public static bool IsConfirmKeyDown(GameFlowConfirmKey key)
+        {
+            switch (key)
+            {
+                case GameFlowConfirmKey.Enter:
+                    return UnityEngine.Input.GetKeyDown(KeyCode.Return) || UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter);
+                case GameFlowConfirmKey.Space:
+                default:
+                    return UnityEngine.Input.GetKeyDown(KeyCode.Space);
+            }
+        }
 
         private void OnValidate()
         {

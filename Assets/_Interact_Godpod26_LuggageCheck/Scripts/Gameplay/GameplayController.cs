@@ -247,6 +247,7 @@ namespace RFIDBaggage.Gameplay
             }
 
             SelectableItem defaultItem = ResolveDefaultItem(currentView);
+            selectionController.SetConfirmKey(gameFlowManager.ConfirmKey);
             selectionController.Initialize(currentItems, defaultItem, level.SelectionInputCooldown, level.ConfirmInputCooldown);
             selectionController.DisableInput();
 
