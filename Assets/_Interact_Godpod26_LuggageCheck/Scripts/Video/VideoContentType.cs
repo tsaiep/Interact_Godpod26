@@ -5,6 +5,7 @@ namespace RFIDBaggage.Video
         None,
         Idle,
         Intro,
+        Gameplay,
         Success,
         Failure
     }

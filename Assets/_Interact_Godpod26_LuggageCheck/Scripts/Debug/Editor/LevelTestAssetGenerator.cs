@@ -91,6 +91,7 @@ namespace RFIDBaggage.DebugTools.Editor
             SetPrivateField(level, "displayName", displayName);
             SetPrivateField(level, "rfidId", rfidId);
             SetPrivateField(level, "introVideoRelativePath", $"Videos/{folder}/{folder}_Intro.mp4");
+            SetPrivateField(level, "gameplayVideoRelativePath", $"Videos/{folder}/{folder}_Gameplay.mp4");
             SetPrivateField(level, "successVideoRelativePath", $"Videos/{folder}/{folder}_Success.mp4");
             SetPrivateField(level, "failureVideoRelativePath", $"Videos/{folder}/{folder}_Failure.mp4");
             SetPrivateField(level, "finalFrameImageRelativePath", $"Images/{folder}/{folder}_FinalFrame.png");

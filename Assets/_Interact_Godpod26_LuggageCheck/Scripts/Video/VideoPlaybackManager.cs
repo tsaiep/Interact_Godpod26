@@ -109,6 +109,11 @@ namespace RFIDBaggage.Video
             Prepare(VideoContentType.Intro, relativePath, false);
         }
 
+        public void PrepareGameplay(string relativePath)
+        {
+            Prepare(VideoContentType.Gameplay, relativePath, true);
+        }
+
         public void PrepareSuccess(string relativePath)
         {
             Prepare(VideoContentType.Success, relativePath, false);
@@ -237,6 +242,23 @@ namespace RFIDBaggage.Video
             StopPlayer(contentBState);
             activeContentState = null;
             standbyContentState = nextStandbyState != null ? nextStandbyState : contentAState != null ? contentAState : contentBState;
+
+            if (CurrentContentType != VideoContentType.Idle)
+            {
+                IsPlaying = false;
+                CurrentContentType = VideoContentType.None;
+            }
+        }
+
+        public void PauseContent()
+        {
+            if (activeContentState == null || activeContentState.Player == null)
+            {
+                return;
+            }
+
+            activeContentState.Player.Pause();
+            activeContentState.IsPlaying = false;
 
             if (CurrentContentType != VideoContentType.Idle)
             {

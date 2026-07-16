@@ -20,7 +20,7 @@ namespace RFIDBaggage.Video
         [SerializeField, Tooltip("Video preparation and playback manager.")]
         private VideoPlaybackManager videoPlaybackManager;
 
-        [SerializeField, Tooltip("StreamingAssets image loader for final-frame backgrounds.")]
+        [SerializeField, Tooltip("Legacy StreamingAssets image loader for final-frame backgrounds. Gameplay now uses a looping video.")]
         private StreamingImageLoader streamingImageLoader;
 
         [SerializeField, Tooltip("Display layer switcher.")]
@@ -34,9 +34,7 @@ namespace RFIDBaggage.Video
         private UnityEvent onFailurePerformanceCue = new UnityEvent();
 
         private LevelConfig currentLevel;
-        private Texture2D finalFrameTexture;
-        private bool finalFrameLoadCompleted;
-        private Coroutine gamePreparingCoroutine;
+        private Coroutine resultPrepareDelayCoroutine;
         private Coroutine resultPerformanceCueCoroutine;
 
         private void OnEnable()
@@ -68,6 +66,7 @@ namespace RFIDBaggage.Video
                 videoPlaybackManager.VideoFailed -= HandleVideoFailed;
             }
 
+            StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
             StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
         }
 
@@ -88,13 +87,13 @@ namespace RFIDBaggage.Video
                     PlayIntro();
                     break;
                 case GameState.GamePreparing:
-                    BeginGamePreparing();
+                    PrepareGameplay();
                     break;
                 case GameState.SuccessPreparing:
-                    PrepareResult(VideoContentType.Success);
+                    SchedulePrepareResult(VideoContentType.Success, previousState);
                     break;
                 case GameState.FailurePreparing:
-                    PrepareResult(VideoContentType.Failure);
+                    SchedulePrepareResult(VideoContentType.Failure, previousState);
                     break;
                 case GameState.SuccessPlaying:
                     PlayResult(VideoContentType.Success);
@@ -128,11 +127,12 @@ namespace RFIDBaggage.Video
         private void InitializeLevel()
         {
             currentLevel = gameFlowManager.CurrentLevel;
-            finalFrameTexture = null;
-            finalFrameLoadCompleted = false;
 
-            StopCoroutineIfRunning(ref gamePreparingCoroutine);
-            streamingImageLoader.ReleaseCurrentTexture();
+            StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
+            if (streamingImageLoader != null)
+            {
+                streamingImageLoader.ReleaseCurrentTexture();
+            }
 
             if (currentLevel == null)
             {
@@ -156,20 +156,6 @@ namespace RFIDBaggage.Video
                 return;
             }
 
-            finalFrameLoadCompleted = false;
-            streamingImageLoader.Load(
-                currentLevel.FinalFrameImageRelativePath,
-                texture =>
-                {
-                    finalFrameTexture = texture;
-                    finalFrameLoadCompleted = true;
-                },
-                message =>
-                {
-                    finalFrameLoadCompleted = false;
-                    gameFlowManager.ReportRecoverableError(message);
-                });
-
             videoPlaybackManager.PrepareIntro(currentLevel.IntroVideoRelativePath);
         }
 
@@ -183,33 +169,80 @@ namespace RFIDBaggage.Video
             }
         }
 
-        private void BeginGamePreparing()
+        private void PrepareGameplay()
         {
-            StopCoroutineIfRunning(ref gamePreparingCoroutine);
-            gamePreparingCoroutine = StartCoroutine(GamePreparingRoutine());
+            if (currentLevel == null)
+            {
+                gameFlowManager.ReportRecoverableError("GamePreparing entered without a current level.");
+                return;
+            }
+
+            videoPlaybackManager.PrepareGameplay(currentLevel.GameplayVideoRelativePath);
         }
 
-        private IEnumerator GamePreparingRoutine()
+        private void PlayGameplay()
         {
-            float timeout = videoSystemConfig != null ? videoSystemConfig.ImageLoadTimeout : 10f;
-            float start = Time.unscaledTime;
+            if (videoPlaybackManager.PlayPrepared(VideoContentType.Gameplay))
+            {
+                transitionController.ShowContentVideo(videoPlaybackManager.GetCurrentContentTexture());
+                videoPlaybackManager.PauseIdle();
+                videoPlaybackManager.StopInactiveContent();
+                gameFlowManager.NotifyGamePrepared();
+            }
+        }
 
-            while (!finalFrameLoadCompleted && Time.unscaledTime - start < timeout)
+        private void SchedulePrepareResult(VideoContentType resultType, GameState previousState)
+        {
+            if (currentLevel == null)
+            {
+                gameFlowManager.ReportRecoverableError($"{resultType}Preparing entered without a current level.");
+                return;
+            }
+
+            StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
+
+            float delay = previousState == GameState.Gameplay && videoSystemConfig != null
+                ? videoSystemConfig.GameplayVideoStopDelayBeforeResultPrepare
+                : 0f;
+
+            if (delay <= 0f)
+            {
+                PauseGameplayLoopBeforeResultPrepare();
+                PrepareResult(resultType);
+                return;
+            }
+
+            resultPrepareDelayCoroutine = StartCoroutine(ResultPrepareDelayRoutine(resultType, delay));
+        }
+
+        private IEnumerator ResultPrepareDelayRoutine(VideoContentType resultType, float delay)
+        {
+            float startTime = Time.unscaledTime;
+
+            while (IsExpectedResultPreparing(resultType) && Time.unscaledTime - startTime < delay)
             {
                 yield return null;
             }
 
-            gamePreparingCoroutine = null;
+            resultPrepareDelayCoroutine = null;
 
-            if (!finalFrameLoadCompleted || finalFrameTexture == null)
+            if (!IsExpectedResultPreparing(resultType))
             {
-                gameFlowManager.ReportRecoverableError("Final frame image did not finish loading before timeout.");
                 yield break;
             }
 
-            transitionController.ShowStaticBackground(finalFrameTexture);
-            videoPlaybackManager.StopContent();
-            gameFlowManager.NotifyGamePrepared();
+            PauseGameplayLoopBeforeResultPrepare();
+            PrepareResult(resultType);
+        }
+
+        private void PauseGameplayLoopBeforeResultPrepare()
+        {
+            if (videoPlaybackManager.CurrentContentType != VideoContentType.Gameplay)
+            {
+                return;
+            }
+
+            videoPlaybackManager.PauseContent();
         }
 
         private void PrepareResult(VideoContentType resultType)
@@ -245,11 +278,12 @@ namespace RFIDBaggage.Video
 
         private void ResetVideoFlow()
         {
-            StopCoroutineIfRunning(ref gamePreparingCoroutine);
+            StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
             StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
-            streamingImageLoader.CancelLoading();
-            finalFrameTexture = null;
-            finalFrameLoadCompleted = false;
+            if (streamingImageLoader != null)
+            {
+                streamingImageLoader.CancelLoading();
+            }
             currentLevel = null;
         }
 
@@ -270,6 +304,12 @@ namespace RFIDBaggage.Video
             if (contentType == VideoContentType.Intro && state == GameState.IntroPreparing)
             {
                 gameFlowManager.NotifyIntroPrepared();
+                return;
+            }
+
+            if (contentType == VideoContentType.Gameplay && state == GameState.GamePreparing)
+            {
+                PlayGameplay();
                 return;
             }
 
@@ -351,6 +391,12 @@ namespace RFIDBaggage.Video
                    (resultType == VideoContentType.Failure && gameFlowManager.CurrentState == GameState.FailurePlaying);
         }
 
+        private bool IsExpectedResultPreparing(VideoContentType resultType)
+        {
+            return (resultType == VideoContentType.Success && gameFlowManager.CurrentState == GameState.SuccessPreparing) ||
+                   (resultType == VideoContentType.Failure && gameFlowManager.CurrentState == GameState.FailurePreparing);
+        }
+
         private void InvokeResultPerformanceCue(VideoContentType resultType)
         {
             if (resultType == VideoContentType.Success)
@@ -368,9 +414,9 @@ namespace RFIDBaggage.Video
         private bool ValidateLevelMedia(LevelConfig level)
         {
             if (!ValidateFilePath(level.IntroVideoRelativePath, "Intro video") ||
+                !ValidateFilePath(level.GameplayVideoRelativePath, "Gameplay video") ||
                 !ValidateFilePath(level.SuccessVideoRelativePath, "Success video") ||
-                !ValidateFilePath(level.FailureVideoRelativePath, "Failure video") ||
-                !ValidateFilePath(level.FinalFrameImageRelativePath, "Final frame image"))
+                !ValidateFilePath(level.FailureVideoRelativePath, "Failure video"))
             {
                 gameFlowManager.ReportRecoverableError($"Level media validation failed for {level.LevelId}.");
                 return false;
@@ -401,7 +447,6 @@ namespace RFIDBaggage.Video
             if (gameFlowManager != null &&
                 videoSystemConfig != null &&
                 videoPlaybackManager != null &&
-                streamingImageLoader != null &&
                 transitionController != null)
             {
                 return true;
@@ -419,9 +464,10 @@ namespace RFIDBaggage.Video
         private void ReleaseStaticBackgroundAfterIdleIsVisible()
         {
             transitionController.ClearStaticBackground();
-            streamingImageLoader.ReleaseCurrentTexture();
-            finalFrameTexture = null;
-            finalFrameLoadCompleted = false;
+            if (streamingImageLoader != null)
+            {
+                streamingImageLoader.ReleaseCurrentTexture();
+            }
         }
 
         private void StopCoroutineIfRunning(ref Coroutine coroutine)

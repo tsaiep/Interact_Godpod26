@@ -16,6 +16,7 @@ MonoBehaviour:
   displayName: Test Level 03
   rfidId: RFID_03
   introVideoRelativePath: LuggageCheck/Videos/Level03/Level03_Intro.mp4
+  gameplayVideoRelativePath: LuggageCheck/Videos/Level03/Level03_Gameplay.mp4
   successVideoRelativePath: LuggageCheck/Videos/Level03/Level03_Success.mp4
   failureVideoRelativePath: LuggageCheck/Videos/Level03/Level03_Failure.mp4
   finalFrameImageRelativePath: LuggageCheck/Images/Level03/Level03_FinalFrame.png

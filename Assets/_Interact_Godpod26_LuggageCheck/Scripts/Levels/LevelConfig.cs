@@ -22,6 +22,9 @@ namespace RFIDBaggage.Levels
         [SerializeField, Tooltip("Intro video path relative to StreamingAssets.")]
         private string introVideoRelativePath;
 
+        [SerializeField, Tooltip("Gameplay looping background video path relative to StreamingAssets.")]
+        private string gameplayVideoRelativePath;
+
         [SerializeField, Tooltip("Success video path relative to StreamingAssets.")]
         private string successVideoRelativePath;
 
@@ -71,6 +74,7 @@ namespace RFIDBaggage.Levels
         public string DisplayName => displayName;
         public string RfidId => rfidId;
         public string IntroVideoRelativePath => introVideoRelativePath;
+        public string GameplayVideoRelativePath => gameplayVideoRelativePath;
         public string SuccessVideoRelativePath => successVideoRelativePath;
         public string FailureVideoRelativePath => failureVideoRelativePath;
         public string FinalFrameImageRelativePath => finalFrameImageRelativePath;
