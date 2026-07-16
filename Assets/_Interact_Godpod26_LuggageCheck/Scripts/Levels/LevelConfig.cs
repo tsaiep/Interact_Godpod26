@@ -41,6 +41,9 @@ namespace RFIDBaggage.Levels
         [SerializeField, Min(0f), Tooltip("Seconds before the failure video ends to fire the failure performance event. Set 0 to disable.")]
         private float failurePerformanceLeadTime;
 
+        [SerializeField, Min(0f), Tooltip("Seconds after entering SuccessPreparing or FailurePreparing from Gameplay before pausing the gameplay loop and preparing the result video.")]
+        private float gameplayVideoStopDelayBeforeResultPrepare = 5f;
+
         [Header("Scene References")]
         [SerializeField, Tooltip("Optional level root. Prefer GameplayController Level Views for scene object references.")]
         private GameObject levelRoot;
@@ -80,6 +83,7 @@ namespace RFIDBaggage.Levels
         public string FinalFrameImageRelativePath => finalFrameImageRelativePath;
         public float SuccessPerformanceLeadTime => successPerformanceLeadTime;
         public float FailurePerformanceLeadTime => failurePerformanceLeadTime;
+        public float GameplayVideoStopDelayBeforeResultPrepare => gameplayVideoStopDelayBeforeResultPrepare;
         public GameObject LevelRoot => levelRoot;
         public float GameplayDuration => gameplayDuration;
         public float GameplayStartDelay => gameplayStartDelay;
@@ -119,6 +123,12 @@ namespace RFIDBaggage.Levels
             if (failurePerformanceLeadTime < 0f)
             {
                 message = $"{name} has an invalid failure performance lead time.";
+                return false;
+            }
+
+            if (gameplayVideoStopDelayBeforeResultPrepare < 0f)
+            {
+                message = $"{name} has an invalid gameplay video stop delay before result prepare.";
                 return false;
             }
 
@@ -181,6 +191,7 @@ namespace RFIDBaggage.Levels
             inputCooldown = Mathf.Max(0f, inputCooldown);
             successPerformanceLeadTime = Mathf.Max(0f, successPerformanceLeadTime);
             failurePerformanceLeadTime = Mathf.Max(0f, failurePerformanceLeadTime);
+            gameplayVideoStopDelayBeforeResultPrepare = Mathf.Max(0f, gameplayVideoStopDelayBeforeResultPrepare);
             gameplayStartDelay = Mathf.Max(0f, gameplayStartDelay);
             warningStartTime = Mathf.Max(0f, warningStartTime);
             selectionInputCooldown = Mathf.Max(0f, selectionInputCooldown);

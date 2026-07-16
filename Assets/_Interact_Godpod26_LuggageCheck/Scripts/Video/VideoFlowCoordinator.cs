@@ -201,8 +201,8 @@ namespace RFIDBaggage.Video
 
             StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
 
-            float delay = previousState == GameState.Gameplay && videoSystemConfig != null
-                ? videoSystemConfig.GameplayVideoStopDelayBeforeResultPrepare
+            float delay = previousState == GameState.Gameplay
+                ? currentLevel.GameplayVideoStopDelayBeforeResultPrepare
                 : 0f;
 
             if (delay <= 0f)
