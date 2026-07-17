@@ -22,7 +22,7 @@ MonoBehaviour:
   finalFrameImageRelativePath: LuggageCheck/Images/Level01/Level01_FinalFrame.png
   successPerformanceLeadTime: 1
   failurePerformanceLeadTime: 1
-  gameplayVideoStopDelayBeforeResultPrepare: 5
+  gameplayVideoStopDelayBeforeResultPrepare: 6.1
   levelRoot: {fileID: 0}
   gameplayDuration: 15
   gameplayStartDelay: 3
