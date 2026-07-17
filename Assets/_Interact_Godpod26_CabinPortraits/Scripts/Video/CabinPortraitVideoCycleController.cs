@@ -85,6 +85,12 @@ namespace CabinPortraits.Video
         Enter
     }
 
+    public enum CabinPortraitSwitchRequestSource
+    {
+        ManualInput,
+        Auto
+    }
+
     public sealed class CabinPortraitVideoCycleController : MonoBehaviour
     {
         public enum FlowState
@@ -137,8 +143,11 @@ namespace CabinPortraits.Video
         private FlowState currentState = FlowState.SystemInitializing;
 
         [Header("Unity Events")]
-        [SerializeField, Tooltip("Invoked when a switch request is accepted. Args: current index, next index.")]
+        [SerializeField, Tooltip("Invoked when a manual switch request is accepted. Args: current index, next index.")]
         private CabinPortraitVideoSwitchEvent onSwitchRequested = new CabinPortraitVideoSwitchEvent();
+
+        [SerializeField, Tooltip("Invoked when an automatic switch request is accepted. Args: current index, next index.")]
+        private CabinPortraitVideoSwitchEvent onAutoSwitchRequested = new CabinPortraitVideoSwitchEvent();
 
         [SerializeField, Tooltip("Invoked before waiting Transition Cover Delay. Start the covering transition here.")]
         private UnityEvent onTransitionStarted = new UnityEvent();
@@ -305,18 +314,23 @@ namespace CabinPortraits.Video
 
         public bool RequestNextVideo()
         {
+            return RequestNextVideo(CabinPortraitSwitchRequestSource.ManualInput);
+        }
+
+        private bool RequestNextVideo(CabinPortraitSwitchRequestSource source)
+        {
             if (!CanAcceptSwitchRequest(out string rejectionReason))
             {
                 if (ShouldLog)
                 {
-                    Debug.Log($"[CabinPortraits.Video] Ignored switch request. {rejectionReason}", this);
+                    Debug.Log($"[CabinPortraits.Video] Ignored {DescribeSwitchRequestSource(source)} switch request. {rejectionReason}", this);
                 }
 
                 onInputRejected.Invoke(rejectionReason);
                 return false;
             }
 
-            switchCoroutine = StartCoroutine(SwitchRoutine());
+            switchCoroutine = StartCoroutine(SwitchRoutine(source));
             return true;
         }
 
@@ -375,7 +389,7 @@ namespace CabinPortraits.Video
             startupCoroutine = null;
         }
 
-        private IEnumerator SwitchRoutine()
+        private IEnumerator SwitchRoutine(CabinPortraitSwitchRequestSource source)
         {
             float acceptedAt = Time.unscaledTime;
             inputLocked = true;
@@ -387,7 +401,7 @@ namespace CabinPortraits.Video
             int previousIndex = currentIndex;
             int nextIndex = sequenceConfig.GetNextIndex(currentIndex);
 
-            onSwitchRequested.Invoke(previousIndex, nextIndex);
+            InvokeSwitchRequested(source, previousIndex, nextIndex);
 
             if (!TransitionTo(FlowState.Switching))
             {
@@ -485,7 +499,7 @@ namespace CabinPortraits.Video
                 Debug.Log($"[CabinPortraits.Video] Auto switch interval reached after {sequenceConfig.AutoSwitchInterval:0.##} seconds.", this);
             }
 
-            if (!RequestNextVideo())
+            if (!RequestNextVideo(CabinPortraitSwitchRequestSource.Auto))
             {
                 ScheduleNextAutoSwitch();
             }
@@ -502,6 +516,32 @@ namespace CabinPortraits.Video
 
             lastAutoSwitchInterval = sequenceConfig.AutoSwitchInterval;
             nextAutoSwitchAt = Time.unscaledTime + sequenceConfig.AutoSwitchInterval;
+        }
+
+        private void InvokeSwitchRequested(CabinPortraitSwitchRequestSource source, int previousIndex, int nextIndex)
+        {
+            switch (source)
+            {
+                case CabinPortraitSwitchRequestSource.Auto:
+                    onAutoSwitchRequested.Invoke(previousIndex, nextIndex);
+                    break;
+                case CabinPortraitSwitchRequestSource.ManualInput:
+                default:
+                    onSwitchRequested.Invoke(previousIndex, nextIndex);
+                    break;
+            }
+        }
+
+        private static string DescribeSwitchRequestSource(CabinPortraitSwitchRequestSource source)
+        {
+            switch (source)
+            {
+                case CabinPortraitSwitchRequestSource.Auto:
+                    return "auto";
+                case CabinPortraitSwitchRequestSource.ManualInput:
+                default:
+                    return "manual";
+            }
         }
 
         private bool CanAcceptSwitchRequest(out string rejectionReason)
