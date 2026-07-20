@@ -3,6 +3,12 @@ using UnityEngine.Events;
 
 namespace RFIDBaggage.Selection
 {
+    public enum SelectionDeselectReason
+    {
+        Normal,
+        GameplayEnded
+    }
+
     public sealed class SelectableItem : MonoBehaviour
     {
         [Header("Identity")]
@@ -28,6 +34,7 @@ namespace RFIDBaggage.Selection
         [Header("Unity Events")]
         [SerializeField] private UnityEvent onSelected = new UnityEvent();
         [SerializeField] private UnityEvent onDeselected = new UnityEvent();
+        [SerializeField] private UnityEvent onGameplayEndedDeselected = new UnityEvent();
         [SerializeField] private UnityEvent onCorrect = new UnityEvent();
         [SerializeField] private UnityEvent onWrong = new UnityEvent();
         [SerializeField] private UnityEvent onReset = new UnityEvent();
@@ -46,7 +53,7 @@ namespace RFIDBaggage.Selection
             IsSelectable = initiallySelectable;
         }
 
-        public void SetSelected(bool selected)
+        public void SetSelected(bool selected, SelectionDeselectReason deselectReason = SelectionDeselectReason.Normal)
         {
             if (IsSelected == selected)
             {
@@ -61,7 +68,14 @@ namespace RFIDBaggage.Selection
             }
             else
             {
-                onDeselected.Invoke();
+                if (deselectReason == SelectionDeselectReason.GameplayEnded)
+                {
+                    onGameplayEndedDeselected.Invoke();
+                }
+                else
+                {
+                    onDeselected.Invoke();
+                }
             }
         }
 

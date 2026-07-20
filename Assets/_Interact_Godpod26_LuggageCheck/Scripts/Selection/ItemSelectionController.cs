@@ -200,9 +200,9 @@ namespace RFIDBaggage.Selection
             SetCurrentSelection(nearest);
         }
 
-        public void ClearSelection()
+        public void ClearSelection(SelectionDeselectReason deselectReason = SelectionDeselectReason.Normal)
         {
-            SetCurrentSelection(null);
+            SetCurrentSelection(null, deselectReason);
         }
 
         public void ResetController()
@@ -312,7 +312,9 @@ namespace RFIDBaggage.Selection
             return GetScreenPosition(CurrentSelection);
         }
 
-        private void SetCurrentSelection(SelectableItem item)
+        private void SetCurrentSelection(
+            SelectableItem item,
+            SelectionDeselectReason deselectReason = SelectionDeselectReason.Normal)
         {
             if (CurrentSelection == item)
             {
@@ -321,7 +323,7 @@ namespace RFIDBaggage.Selection
 
             if (CurrentSelection != null)
             {
-                CurrentSelection.SetSelected(false);
+                CurrentSelection.SetSelected(false, deselectReason);
             }
 
             CurrentSelection = item;

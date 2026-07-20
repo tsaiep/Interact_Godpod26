@@ -173,7 +173,7 @@ namespace RFIDBaggage.Gameplay
                     break;
                 case GameState.SuccessPreparing:
                 case GameState.FailurePreparing:
-                    StopGameplayInput();
+                    StopGameplayInput(SelectionDeselectReason.GameplayEnded);
                     break;
                 case GameState.ErrorRecovery:
                     StopGameplayInput();
@@ -383,7 +383,7 @@ namespace RFIDBaggage.Gameplay
 
             resultReported = true;
             gameplayRunning = false;
-            StopGameplayInput();
+            StopGameplayInput(SelectionDeselectReason.GameplayEnded);
             onGameSuccess.Invoke();
             gameFlowManager.NotifyGameSuccess();
         }
@@ -399,17 +399,17 @@ namespace RFIDBaggage.Gameplay
             gameplayRunning = false;
             remainingTime = 0f;
             UpdateCountdownUi();
-            StopGameplayInput();
+            StopGameplayInput(SelectionDeselectReason.GameplayEnded);
             onGameFailure.Invoke();
             gameFlowManager.NotifyGameFailure();
         }
 
-        private void StopGameplayInput()
+        private void StopGameplayInput(SelectionDeselectReason deselectReason = SelectionDeselectReason.Normal)
         {
             if (selectionController != null)
             {
                 selectionController.DisableInput();
-                selectionController.ClearSelection();
+                selectionController.ClearSelection(deselectReason);
             }
 
             StopCoroutineIfRunning(ref gameplayStartDelayCoroutine);
