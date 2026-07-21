@@ -15,6 +15,7 @@ namespace RFIDBaggage.Core
         FailurePreparing,
         FailurePlaying,
         Resetting,
-        ErrorRecovery
+        ErrorRecovery,
+        GameplayStartPending
     }
 }

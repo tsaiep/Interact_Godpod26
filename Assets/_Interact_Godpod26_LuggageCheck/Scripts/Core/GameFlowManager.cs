@@ -28,6 +28,7 @@ namespace RFIDBaggage.Core
         [SerializeField] private UnityEvent onIntroPreparingEntered = new UnityEvent();
         [SerializeField] private UnityEvent onIntroPlayingEntered = new UnityEvent();
         [SerializeField] private UnityEvent onGamePreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onGameplayStartPendingEntered = new UnityEvent();
         [SerializeField] private UnityEvent onGameplayEntered = new UnityEvent();
         [SerializeField] private UnityEvent onSuccessPreparingEntered = new UnityEvent();
         [SerializeField] private UnityEvent onSuccessPlayingEntered = new UnityEvent();
@@ -62,6 +63,9 @@ namespace RFIDBaggage.Core
                     break;
                 case GameState.GamePreparing:
                     InvokeSafely(onGamePreparingEntered.Invoke, nameof(onGamePreparingEntered));
+                    break;
+                case GameState.GameplayStartPending:
+                    InvokeSafely(onGameplayStartPendingEntered.Invoke, nameof(onGameplayStartPendingEntered));
                     break;
                 case GameState.Gameplay:
                     InvokeSafely(onGameplayEntered.Invoke, nameof(onGameplayEntered));
@@ -111,6 +115,7 @@ namespace RFIDBaggage.Core
             GameState.IntroPreparing,
             GameState.IntroPlaying,
             GameState.GamePreparing,
+            GameState.GameplayStartPending,
             GameState.Gameplay,
             GameState.SuccessPreparing,
             GameState.SuccessPlaying,
@@ -132,6 +137,22 @@ namespace RFIDBaggage.Core
         [SerializeField, Tooltip("Key used to confirm gameplay selections. Enter accepts both Return and Keypad Enter.")]
         private GameFlowConfirmKey confirmKey = GameFlowConfirmKey.Space;
 
+        [Header("Gameplay Start Gate")]
+        [SerializeField, Tooltip("When enabled, the flow waits after gameplay content is prepared until the confirm key is held.")]
+        private bool requireGameplayStartConfirmHold = true;
+
+        [SerializeField, Min(0f), Tooltip("Seconds the confirm key must be held before Gameplay starts.")]
+        private float gameplayStartConfirmHoldSeconds = 2f;
+
+        [SerializeField, Min(0.01f), Tooltip("Seconds between repeated hold tick events while the confirm key is held.")]
+        private float gameplayStartConfirmHoldTickInterval = 0.5f;
+
+        [SerializeField, Tooltip("Invoked every Gameplay Start Hold Tick Interval seconds while the confirm key is held in GameplayStartPending.")]
+        private UnityEvent onGameplayStartConfirmHoldTick = new UnityEvent();
+
+        [SerializeField, Tooltip("Invoked once when the confirm key has been held long enough to enter Gameplay.")]
+        private UnityEvent onGameplayStartConfirmHoldCompleted = new UnityEvent();
+
         [Header("Runtime Debug")]
         [SerializeField, Tooltip("All flow states for Inspector display only. This list is not used to drive state transitions.")]
         private GameState[] visibleStateSequence = (GameState[])StateSequence.Clone();
@@ -146,15 +167,27 @@ namespace RFIDBaggage.Core
         private LevelConfig currentLevel;
         private bool resultLocked;
         private bool logResetCompleteWhenIdle;
+        private float gameplayStartConfirmHeldSeconds;
+        private float nextGameplayStartConfirmHoldTickTime;
+        private bool gameplayStartConfirmHoldCompleted;
 
         public IReadOnlyList<GameState> AllStates => ReadOnlyStateSequence;
         public GameState CurrentState => currentState;
         public LevelConfig CurrentLevel => currentLevel;
         public GameFlowConfirmKey ConfirmKey => confirmKey;
+        public bool RequireGameplayStartConfirmHold => requireGameplayStartConfirmHold;
+        public float GameplayStartConfirmHoldSeconds => gameplayStartConfirmHoldSeconds;
+        public float GameplayStartConfirmHoldTickInterval => gameplayStartConfirmHoldTickInterval;
+        public float GameplayStartConfirmHeldSeconds => gameplayStartConfirmHeldSeconds;
+        public float GameplayStartConfirmHoldProgress => gameplayStartConfirmHoldSeconds > 0f
+            ? Mathf.Clamp01(gameplayStartConfirmHeldSeconds / gameplayStartConfirmHoldSeconds)
+            : 1f;
 
         public event Action<GameState, GameState> StateChanged;
         public event Action<LevelConfig> LevelStarted;
         public event Action<LevelConfig> GameplayStarted;
+        public event Action<float, float> GameplayStartConfirmHoldTick;
+        public event Action GameplayStartConfirmHoldCompleted;
         public event Action<LevelConfig, bool> LevelFinished;
         public event Action LevelReset;
 
@@ -175,9 +208,28 @@ namespace RFIDBaggage.Core
             }
         }
 
+        public bool IsConfirmKeyPressed()
+        {
+            return IsConfirmKeyPressed(confirmKey);
+        }
+
+        public static bool IsConfirmKeyPressed(GameFlowConfirmKey key)
+        {
+            switch (key)
+            {
+                case GameFlowConfirmKey.Enter:
+                    return UnityEngine.Input.GetKey(KeyCode.Return) || UnityEngine.Input.GetKey(KeyCode.KeypadEnter);
+                case GameFlowConfirmKey.Space:
+                default:
+                    return UnityEngine.Input.GetKey(KeyCode.Space);
+            }
+        }
+
         private void OnValidate()
         {
             visibleStateSequence = (GameState[])StateSequence.Clone();
+            gameplayStartConfirmHoldSeconds = Mathf.Max(0f, gameplayStartConfirmHoldSeconds);
+            gameplayStartConfirmHoldTickInterval = Mathf.Max(0.01f, gameplayStartConfirmHoldTickInterval);
         }
 
         private void Start()
@@ -188,6 +240,14 @@ namespace RFIDBaggage.Core
             }
 
             TransitionTo(GameState.IdlePreparing);
+        }
+
+        private void Update()
+        {
+            if (currentState == GameState.GameplayStartPending)
+            {
+                UpdateGameplayStartConfirmHold();
+            }
         }
 
         public void NotifyIdlePrepared()
@@ -263,7 +323,23 @@ namespace RFIDBaggage.Core
 
         public void NotifyGamePrepared()
         {
-            if (NotifyExpected(GameState.GamePreparing, GameState.Gameplay, "game prepared"))
+            if (currentState != GameState.GamePreparing)
+            {
+                Debug.LogWarning($"[GameFlow] Ignored game prepared notification while state is {currentState}. Expected {GameState.GamePreparing}.", this);
+                return;
+            }
+
+            if (requireGameplayStartConfirmHold)
+            {
+                if (TransitionTo(GameState.GameplayStartPending) && gameplayStartConfirmHoldSeconds <= 0f)
+                {
+                    CompleteGameplayStartConfirmHold();
+                }
+
+                return;
+            }
+
+            if (TransitionTo(GameState.Gameplay))
             {
                 InvokeGameplayStarted(currentLevel);
             }
@@ -358,6 +434,64 @@ namespace RFIDBaggage.Core
             return TransitionTo(nextState);
         }
 
+        private void UpdateGameplayStartConfirmHold()
+        {
+            if (gameplayStartConfirmHoldCompleted)
+            {
+                return;
+            }
+
+            if (!IsConfirmKeyPressed())
+            {
+                ResetGameplayStartConfirmHold();
+                return;
+            }
+
+            gameplayStartConfirmHeldSeconds = Mathf.Min(
+                gameplayStartConfirmHeldSeconds + Time.unscaledDeltaTime,
+                gameplayStartConfirmHoldSeconds);
+
+            while (gameplayStartConfirmHeldSeconds >= nextGameplayStartConfirmHoldTickTime &&
+                   nextGameplayStartConfirmHoldTickTime <= gameplayStartConfirmHoldSeconds)
+            {
+                InvokeGameplayStartConfirmHoldTick(gameplayStartConfirmHeldSeconds, gameplayStartConfirmHoldSeconds);
+                nextGameplayStartConfirmHoldTickTime += gameplayStartConfirmHoldTickInterval;
+            }
+
+            if (gameplayStartConfirmHeldSeconds >= gameplayStartConfirmHoldSeconds)
+            {
+                CompleteGameplayStartConfirmHold();
+            }
+        }
+
+        private void CompleteGameplayStartConfirmHold()
+        {
+            if (currentState != GameState.GameplayStartPending || gameplayStartConfirmHoldCompleted)
+            {
+                return;
+            }
+
+            gameplayStartConfirmHoldCompleted = true;
+            gameplayStartConfirmHeldSeconds = gameplayStartConfirmHoldSeconds;
+            InvokeGameplayStartConfirmHoldCompleted();
+
+            if (currentState != GameState.GameplayStartPending)
+            {
+                return;
+            }
+
+            if (TransitionTo(GameState.Gameplay))
+            {
+                InvokeGameplayStarted(currentLevel);
+            }
+        }
+
+        private void ResetGameplayStartConfirmHold()
+        {
+            gameplayStartConfirmHeldSeconds = 0f;
+            nextGameplayStartConfirmHoldTickTime = gameplayStartConfirmHoldTickInterval;
+        }
+
         private void ResetAndReturnToIdle()
         {
             if (currentState == GameState.Resetting)
@@ -409,6 +543,15 @@ namespace RFIDBaggage.Core
 
             GameState previousState = currentState;
             currentState = nextState;
+            if (nextState == GameState.GameplayStartPending)
+            {
+                ResetGameplayStartConfirmHoldState();
+            }
+            else if (previousState == GameState.GameplayStartPending)
+            {
+                ResetGameplayStartConfirmHold();
+            }
+
             Debug.Log($"[GameFlow] {previousState} -> {nextState}", this);
             InvokeStateChanged(previousState, nextState);
             stateEvents.Invoke(nextState);
@@ -441,6 +584,12 @@ namespace RFIDBaggage.Core
                     Debug.LogException(new Exception("[GameFlow] StateChanged handler failed.", exception), this);
                 }
             }
+        }
+
+        private void ResetGameplayStartConfirmHoldState()
+        {
+            gameplayStartConfirmHoldCompleted = false;
+            ResetGameplayStartConfirmHold();
         }
 
         private void InvokeLevelStarted(LevelConfig level)
@@ -482,6 +631,62 @@ namespace RFIDBaggage.Core
                 {
                     Debug.LogException(new Exception("[GameFlow] GameplayStarted handler failed.", exception), this);
                 }
+            }
+        }
+
+        private void InvokeGameplayStartConfirmHoldTick(float heldSeconds, float requiredSeconds)
+        {
+            Action<float, float> handlers = GameplayStartConfirmHoldTick;
+            if (handlers != null)
+            {
+                foreach (Action<float, float> handler in handlers.GetInvocationList())
+                {
+                    try
+                    {
+                        handler.Invoke(heldSeconds, requiredSeconds);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmHoldTick handler failed.", exception), this);
+                    }
+                }
+            }
+
+            try
+            {
+                onGameplayStartConfirmHoldTick.Invoke();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmHoldTick", exception), this);
+            }
+        }
+
+        private void InvokeGameplayStartConfirmHoldCompleted()
+        {
+            Action handlers = GameplayStartConfirmHoldCompleted;
+            if (handlers != null)
+            {
+                foreach (Action handler in handlers.GetInvocationList())
+                {
+                    try
+                    {
+                        handler.Invoke();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmHoldCompleted handler failed.", exception), this);
+                    }
+                }
+            }
+
+            try
+            {
+                onGameplayStartConfirmHoldCompleted.Invoke();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmHoldCompleted", exception), this);
             }
         }
 
@@ -549,6 +754,8 @@ namespace RFIDBaggage.Core
                 case GameState.IntroPlaying:
                     return to == GameState.GamePreparing;
                 case GameState.GamePreparing:
+                    return to == GameState.GameplayStartPending || to == GameState.Gameplay;
+                case GameState.GameplayStartPending:
                     return to == GameState.Gameplay;
                 case GameState.Gameplay:
                     return to == GameState.SuccessPreparing || to == GameState.FailurePreparing;
