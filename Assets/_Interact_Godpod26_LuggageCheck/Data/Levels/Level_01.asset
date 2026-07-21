@@ -25,7 +25,7 @@ MonoBehaviour:
   gameplayVideoStopDelayBeforeResultPrepare: 6.1
   levelRoot: {fileID: 0}
   gameplayDuration: 15
-  gameplayStartDelay: 3
+  gameplayStartDelay: 4
   warningStartTime: 5
   selectionInputCooldown: 0.15
   confirmInputCooldown: 0.25
