@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: M_StartButton
+  m_Name: M_StartButton_Text
   m_Shader: {fileID: -6465566751694194690, guid: b1ca0f261506ef64d89b5e8dedab559f, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -39,7 +39,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: 2e0a5a14493b85b4b8e5a88f84664d89, type: 3}
+        m_Texture: {fileID: 2800000, guid: d74a6b3c4ff65ef4480a9230d9a57153, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:

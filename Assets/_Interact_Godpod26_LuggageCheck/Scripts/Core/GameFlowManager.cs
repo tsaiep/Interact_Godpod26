@@ -144,11 +144,11 @@ namespace RFIDBaggage.Core
         [SerializeField, Min(0f), Tooltip("Seconds the confirm key must be held before Gameplay starts.")]
         private float gameplayStartConfirmHoldSeconds = 2f;
 
-        [SerializeField, Min(0.01f), Tooltip("Seconds between repeated hold tick events while the confirm key is held.")]
-        private float gameplayStartConfirmHoldTickInterval = 0.5f;
+        [SerializeField, Tooltip("Invoked once when the confirm key is pressed down in GameplayStartPending.")]
+        private UnityEvent onGameplayStartConfirmKeyDown = new UnityEvent();
 
-        [SerializeField, Tooltip("Invoked every Gameplay Start Hold Tick Interval seconds while the confirm key is held in GameplayStartPending.")]
-        private UnityEvent onGameplayStartConfirmHoldTick = new UnityEvent();
+        [SerializeField, Tooltip("Invoked once when the confirm key is released in GameplayStartPending.")]
+        private UnityEvent onGameplayStartConfirmKeyUp = new UnityEvent();
 
         [SerializeField, Tooltip("Invoked once when the confirm key has been held long enough to enter Gameplay.")]
         private UnityEvent onGameplayStartConfirmHoldCompleted = new UnityEvent();
@@ -168,7 +168,6 @@ namespace RFIDBaggage.Core
         private bool resultLocked;
         private bool logResetCompleteWhenIdle;
         private float gameplayStartConfirmHeldSeconds;
-        private float nextGameplayStartConfirmHoldTickTime;
         private bool gameplayStartConfirmHoldCompleted;
 
         public IReadOnlyList<GameState> AllStates => ReadOnlyStateSequence;
@@ -177,7 +176,6 @@ namespace RFIDBaggage.Core
         public GameFlowConfirmKey ConfirmKey => confirmKey;
         public bool RequireGameplayStartConfirmHold => requireGameplayStartConfirmHold;
         public float GameplayStartConfirmHoldSeconds => gameplayStartConfirmHoldSeconds;
-        public float GameplayStartConfirmHoldTickInterval => gameplayStartConfirmHoldTickInterval;
         public float GameplayStartConfirmHeldSeconds => gameplayStartConfirmHeldSeconds;
         public float GameplayStartConfirmHoldProgress => gameplayStartConfirmHoldSeconds > 0f
             ? Mathf.Clamp01(gameplayStartConfirmHeldSeconds / gameplayStartConfirmHoldSeconds)
@@ -186,7 +184,8 @@ namespace RFIDBaggage.Core
         public event Action<GameState, GameState> StateChanged;
         public event Action<LevelConfig> LevelStarted;
         public event Action<LevelConfig> GameplayStarted;
-        public event Action<float, float> GameplayStartConfirmHoldTick;
+        public event Action GameplayStartConfirmKeyDown;
+        public event Action GameplayStartConfirmKeyUp;
         public event Action GameplayStartConfirmHoldCompleted;
         public event Action<LevelConfig, bool> LevelFinished;
         public event Action LevelReset;
@@ -205,6 +204,23 @@ namespace RFIDBaggage.Core
                 case GameFlowConfirmKey.Space:
                 default:
                     return UnityEngine.Input.GetKeyDown(KeyCode.Space);
+            }
+        }
+
+        public bool IsConfirmKeyUp()
+        {
+            return IsConfirmKeyUp(confirmKey);
+        }
+
+        public static bool IsConfirmKeyUp(GameFlowConfirmKey key)
+        {
+            switch (key)
+            {
+                case GameFlowConfirmKey.Enter:
+                    return UnityEngine.Input.GetKeyUp(KeyCode.Return) || UnityEngine.Input.GetKeyUp(KeyCode.KeypadEnter);
+                case GameFlowConfirmKey.Space:
+                default:
+                    return UnityEngine.Input.GetKeyUp(KeyCode.Space);
             }
         }
 
@@ -229,7 +245,6 @@ namespace RFIDBaggage.Core
         {
             visibleStateSequence = (GameState[])StateSequence.Clone();
             gameplayStartConfirmHoldSeconds = Mathf.Max(0f, gameplayStartConfirmHoldSeconds);
-            gameplayStartConfirmHoldTickInterval = Mathf.Max(0.01f, gameplayStartConfirmHoldTickInterval);
         }
 
         private void Start()
@@ -441,6 +456,18 @@ namespace RFIDBaggage.Core
                 return;
             }
 
+            if (IsConfirmKeyDown())
+            {
+                InvokeGameplayStartConfirmKeyDown();
+            }
+
+            if (IsConfirmKeyUp())
+            {
+                InvokeGameplayStartConfirmKeyUp();
+                ResetGameplayStartConfirmHold();
+                return;
+            }
+
             if (!IsConfirmKeyPressed())
             {
                 ResetGameplayStartConfirmHold();
@@ -450,13 +477,6 @@ namespace RFIDBaggage.Core
             gameplayStartConfirmHeldSeconds = Mathf.Min(
                 gameplayStartConfirmHeldSeconds + Time.unscaledDeltaTime,
                 gameplayStartConfirmHoldSeconds);
-
-            while (gameplayStartConfirmHeldSeconds >= nextGameplayStartConfirmHoldTickTime &&
-                   nextGameplayStartConfirmHoldTickTime <= gameplayStartConfirmHoldSeconds)
-            {
-                InvokeGameplayStartConfirmHoldTick(gameplayStartConfirmHeldSeconds, gameplayStartConfirmHoldSeconds);
-                nextGameplayStartConfirmHoldTickTime += gameplayStartConfirmHoldTickInterval;
-            }
 
             if (gameplayStartConfirmHeldSeconds >= gameplayStartConfirmHoldSeconds)
             {
@@ -489,7 +509,6 @@ namespace RFIDBaggage.Core
         private void ResetGameplayStartConfirmHold()
         {
             gameplayStartConfirmHeldSeconds = 0f;
-            nextGameplayStartConfirmHoldTickTime = gameplayStartConfirmHoldTickInterval;
         }
 
         private void ResetAndReturnToIdle()
@@ -634,31 +653,59 @@ namespace RFIDBaggage.Core
             }
         }
 
-        private void InvokeGameplayStartConfirmHoldTick(float heldSeconds, float requiredSeconds)
+        private void InvokeGameplayStartConfirmKeyDown()
         {
-            Action<float, float> handlers = GameplayStartConfirmHoldTick;
+            Action handlers = GameplayStartConfirmKeyDown;
             if (handlers != null)
             {
-                foreach (Action<float, float> handler in handlers.GetInvocationList())
+                foreach (Action handler in handlers.GetInvocationList())
                 {
                     try
                     {
-                        handler.Invoke(heldSeconds, requiredSeconds);
+                        handler.Invoke();
                     }
                     catch (Exception exception)
                     {
-                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmHoldTick handler failed.", exception), this);
+                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmKeyDown handler failed.", exception), this);
                     }
                 }
             }
 
             try
             {
-                onGameplayStartConfirmHoldTick.Invoke();
+                onGameplayStartConfirmKeyDown.Invoke();
             }
             catch (Exception exception)
             {
-                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmHoldTick", exception), this);
+                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmKeyDown", exception), this);
+            }
+        }
+
+        private void InvokeGameplayStartConfirmKeyUp()
+        {
+            Action handlers = GameplayStartConfirmKeyUp;
+            if (handlers != null)
+            {
+                foreach (Action handler in handlers.GetInvocationList())
+                {
+                    try
+                    {
+                        handler.Invoke();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmKeyUp handler failed.", exception), this);
+                    }
+                }
+            }
+
+            try
+            {
+                onGameplayStartConfirmKeyUp.Invoke();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmKeyUp", exception), this);
             }
         }
 
