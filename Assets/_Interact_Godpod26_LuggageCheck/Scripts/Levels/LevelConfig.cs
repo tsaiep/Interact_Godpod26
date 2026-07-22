@@ -38,6 +38,10 @@ namespace RFIDBaggage.Levels
         [SerializeField, Tooltip("Final-frame image path relative to StreamingAssets.")]
         private string finalFrameImageRelativePath;
 
+        [Header("Intro Cues")]
+        [SerializeField, Min(0f), Tooltip("Seconds before the intro video ends to fire the intro ending cue. Set 0 to disable.")]
+        private float introEndingCueLeadTime;
+
         [Header("Result Performance Cues")]
         [SerializeField, Min(0f), Tooltip("Seconds before the success video ends to fire the success performance event. Set 0 to disable.")]
         private float successPerformanceLeadTime;
@@ -86,6 +90,7 @@ namespace RFIDBaggage.Levels
         public string SuccessVideoRelativePath => successVideoRelativePath;
         public string FailureVideoRelativePath => failureVideoRelativePath;
         public string FinalFrameImageRelativePath => finalFrameImageRelativePath;
+        public float IntroEndingCueLeadTime => introEndingCueLeadTime;
         public float SuccessPerformanceLeadTime => successPerformanceLeadTime;
         public float FailurePerformanceLeadTime => failurePerformanceLeadTime;
         public float GameplayVideoStopDelayBeforeResultPrepare => gameplayVideoStopDelayBeforeResultPrepare;
@@ -116,6 +121,12 @@ namespace RFIDBaggage.Levels
             if (gameplayDuration <= 0f)
             {
                 message = $"{name} has an invalid gameplay duration.";
+                return false;
+            }
+
+            if (introEndingCueLeadTime < 0f)
+            {
+                message = $"{name} has an invalid intro ending cue lead time.";
                 return false;
             }
 
@@ -268,6 +279,7 @@ namespace RFIDBaggage.Levels
             }
 
             inputCooldown = Mathf.Max(0f, inputCooldown);
+            introEndingCueLeadTime = Mathf.Max(0f, introEndingCueLeadTime);
             successPerformanceLeadTime = Mathf.Max(0f, successPerformanceLeadTime);
             failurePerformanceLeadTime = Mathf.Max(0f, failurePerformanceLeadTime);
             gameplayVideoStopDelayBeforeResultPrepare = Mathf.Max(0f, gameplayVideoStopDelayBeforeResultPrepare);

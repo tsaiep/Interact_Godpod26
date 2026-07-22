@@ -94,6 +94,7 @@ namespace RFIDBaggage.Gameplay
 
         private readonly List<SelectableItem> currentItems = new List<SelectableItem>();
         private LevelGameplayView currentView;
+        private GameObject currentLevelRoot;
         private int totalContrabandCount;
         private int foundContrabandCount;
         private float remainingTime;
@@ -168,6 +169,9 @@ namespace RFIDBaggage.Gameplay
         {
             switch (nextState)
             {
+                case GameState.LevelInitializing:
+                    ActivateCurrentLevelRoot();
+                    break;
                 case GameState.Gameplay:
                     BeginGameplay();
                     break;
@@ -196,16 +200,17 @@ namespace RFIDBaggage.Gameplay
 
             Debug.Log($"[Gameplay] Initializing {level.LevelId}", this);
 
-            currentView = FindView(level);
-            GameObject levelRoot = currentView != null ? currentView.LevelRoot : level.LevelRoot;
+            if (currentLevelRoot == null && !ActivateCurrentLevelRoot())
+            {
+                return;
+            }
+
+            GameObject levelRoot = currentLevelRoot;
             if (levelRoot == null)
             {
                 FailInitialization($"No level root configured for {level.LevelId}.");
                 return;
             }
-
-            SetLevelRootsActive(level.LevelId);
-            levelRoot.SetActive(true);
 
             currentItems.Clear();
             SelectableItem[] foundItems = levelRoot.GetComponentsInChildren<SelectableItem>(true);
@@ -452,8 +457,7 @@ namespace RFIDBaggage.Gameplay
             }
 
             currentItems.Clear();
-            currentView = null;
-            SetLevelRootsActive(string.Empty);
+            DeactivateCurrentLevelRoot();
             onGameplayReset.Invoke();
             Debug.Log("[Gameplay] Reset completed.", this);
         }
@@ -480,6 +484,47 @@ namespace RFIDBaggage.Gameplay
             {
                 countdownFill.fillAmount = gameplayDuration > 0f ? remainingTime / gameplayDuration : 0f;
             }
+        }
+
+        private bool ActivateCurrentLevelRoot()
+        {
+            LevelConfig level = gameFlowManager.CurrentLevel;
+            if (level == null)
+            {
+                FailInitialization("LevelInitializing entered without CurrentLevel.");
+                return false;
+            }
+
+            currentView = FindView(level);
+            currentLevelRoot = ResolveLevelRoot(level, currentView);
+            if (currentLevelRoot == null)
+            {
+                FailInitialization($"No level root configured for {level.LevelId}.");
+                return false;
+            }
+
+            SetLevelRootsActive(level.LevelId);
+            currentLevelRoot.SetActive(true);
+            Debug.Log($"[Gameplay] Activated level root for {level.LevelId}.", this);
+            return true;
+        }
+
+        private void DeactivateCurrentLevelRoot()
+        {
+            SetLevelRootsActive(string.Empty);
+
+            if (currentLevelRoot != null)
+            {
+                currentLevelRoot.SetActive(false);
+            }
+
+            currentLevelRoot = null;
+            currentView = null;
+        }
+
+        private static GameObject ResolveLevelRoot(LevelConfig level, LevelGameplayView view)
+        {
+            return view != null ? view.LevelRoot : level != null ? level.LevelRoot : null;
         }
 
         private LevelGameplayView FindView(LevelConfig level)

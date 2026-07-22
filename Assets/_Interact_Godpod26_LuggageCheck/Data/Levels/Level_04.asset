@@ -21,6 +21,7 @@ MonoBehaviour:
   successVideoRelativePath: LuggageCheck/Videos/Level04/Level04_Success.mp4
   failureVideoRelativePath: LuggageCheck/Videos/Level04/Level04_Failure.mp4
   finalFrameImageRelativePath: LuggageCheck/Images/Level04/Level04_FinalFrame.png
+  introEndingCueLeadTime: 1
   successPerformanceLeadTime: 1
   failurePerformanceLeadTime: 1
   gameplayVideoStopDelayBeforeResultPrepare: 6.1

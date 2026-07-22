@@ -26,6 +26,10 @@ namespace RFIDBaggage.Video
         [SerializeField, Tooltip("Display layer switcher.")]
         private VideoTransitionController transitionController;
 
+        [Header("Intro Cues")]
+        [SerializeField, Tooltip("Invoked once when the intro video reaches its configured lead time before ending.")]
+        private UnityEvent onIntroEndingCue = new UnityEvent();
+
         [Header("Result Performance Cues")]
         [SerializeField, Tooltip("Invoked once when the success video reaches its configured lead time before ending.")]
         private UnityEvent onSuccessPerformanceCue = new UnityEvent();
@@ -35,6 +39,7 @@ namespace RFIDBaggage.Video
 
         private LevelConfig currentLevel;
         private Coroutine idleLoopSignalToIntroDelayCoroutine;
+        private Coroutine introEndingCueCoroutine;
         private Coroutine resultPrepareDelayCoroutine;
         private Coroutine resultPerformanceCueCoroutine;
 
@@ -69,6 +74,7 @@ namespace RFIDBaggage.Video
 
             StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
             StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
+            StopCoroutineIfRunning(ref introEndingCueCoroutine);
             StopCoroutineIfRunning(ref idleLoopSignalToIntroDelayCoroutine);
         }
 
@@ -202,6 +208,7 @@ namespace RFIDBaggage.Video
                 transitionController.ShowContentVideo(videoPlaybackManager.GetCurrentContentTexture());
                 videoPlaybackManager.PauseIdle();
                 videoPlaybackManager.StopInactiveContent();
+                StartIntroEndingCue();
             }
         }
 
@@ -315,6 +322,7 @@ namespace RFIDBaggage.Video
         private void ResetVideoFlow()
         {
             StopCoroutineIfRunning(ref idleLoopSignalToIntroDelayCoroutine);
+            StopCoroutineIfRunning(ref introEndingCueCoroutine);
             StopCoroutineIfRunning(ref resultPrepareDelayCoroutine);
             StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
             if (streamingImageLoader != null)
@@ -363,6 +371,7 @@ namespace RFIDBaggage.Video
 
             if (contentType == VideoContentType.Intro && state == GameState.IntroPlaying)
             {
+                StopCoroutineIfRunning(ref introEndingCueCoroutine);
                 gameFlowManager.NotifyIntroCompleted();
                 return;
             }
@@ -377,8 +386,39 @@ namespace RFIDBaggage.Video
 
         private void HandleVideoFailed(VideoContentType contentType, string message)
         {
+            StopCoroutineIfRunning(ref introEndingCueCoroutine);
             StopCoroutineIfRunning(ref resultPerformanceCueCoroutine);
             gameFlowManager.ReportRecoverableError($"Video {contentType} failed. {message}");
+        }
+
+        private void StartIntroEndingCue()
+        {
+            StopCoroutineIfRunning(ref introEndingCueCoroutine);
+
+            if (currentLevel == null || currentLevel.IntroEndingCueLeadTime <= 0f)
+            {
+                return;
+            }
+
+            introEndingCueCoroutine = StartCoroutine(IntroEndingCueRoutine(currentLevel.IntroEndingCueLeadTime));
+        }
+
+        private IEnumerator IntroEndingCueRoutine(float leadTime)
+        {
+            while (gameFlowManager.CurrentState == GameState.IntroPlaying)
+            {
+                if (videoPlaybackManager.TryGetPlaybackTiming(VideoContentType.Intro, out double time, out double length, out double remaining) &&
+                    remaining <= leadTime)
+                {
+                    Debug.Log($"[VideoFlow] Intro ending cue fired. Time: {time:0.###}/{length:0.###}, remaining: {remaining:0.###}.", this);
+                    onIntroEndingCue.Invoke();
+                    break;
+                }
+
+                yield return null;
+            }
+
+            introEndingCueCoroutine = null;
         }
 
         private void StartResultPerformanceCue(VideoContentType resultType)
