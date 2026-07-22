@@ -19,11 +19,14 @@ MonoBehaviour:
   - CabinPortraits/Videos/Video_04.mp4
   - CabinPortraits/Videos/Video_05.mp4
   - CabinPortraits/Videos/Video_06.mp4
+  timerVideoRelativePaths:
+  - CabinPortraits/Videos/Video_06.mp4
   startIndex: 0
+  timerStartIndex: 0
   playOnStart: 1
   prepareWarningTimeout: 10
   firstFrameWarningTimeout: 10
   transitionCoverDelay: 1
-  switchInputCooldown: 3
-  autoSwitchInterval: 20
+  transitionTriggerBeforeVideoEnd: 1
+  timerVideoDelay: 10
   verboseLogs: 1

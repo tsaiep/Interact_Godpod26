@@ -4,6 +4,7 @@ using System.IO;
 using CabinPortraits.Utilities;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Serialization;
 using UnityEngine.Video;
 
 namespace CabinPortraits.Video
@@ -33,13 +34,24 @@ namespace CabinPortraits.Video
     {
         [SerializeField] private CabinPortraitFlowStateEvent onStateEntered = new CabinPortraitFlowStateEvent();
         [SerializeField] private UnityEvent onSystemInitializingEntered = new UnityEvent();
-        [SerializeField] private UnityEvent onActivePreparingEntered = new UnityEvent();
-        [SerializeField] private UnityEvent onActivePlayingEntered = new UnityEvent();
-        [SerializeField] private UnityEvent onSwitchingEntered = new UnityEvent();
-        [SerializeField] private UnityEvent onCoveredPreparingEntered = new UnityEvent();
+
+        [Header("Current Flow")]
+        [SerializeField] private UnityEvent onInitialPreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onInitialEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onManualVideoPreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onManualVideoPlayingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onTimerVideoPreparingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onTimerVideoPlayingEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onReturningToInitialEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onManualReturningToInitialEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onTimerReturningToInitialEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onCoveredRestoringInitialEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onManualCoveredRestoringInitialEntered = new UnityEvent();
+        [SerializeField] private UnityEvent onTimerCoveredRestoringInitialEntered = new UnityEvent();
+
         [SerializeField] private UnityEvent onErrorRecoveryEntered = new UnityEvent();
 
-        public void Invoke(CabinPortraitVideoCycleController.FlowState state, UnityEngine.Object context)
+        public void Invoke(CabinPortraitVideoCycleController.FlowState state, CabinPortraitSwitchRequestSource source, UnityEngine.Object context)
         {
             InvokeSafely(() => onStateEntered.Invoke(state), $"onStateEntered({state})", context);
 
@@ -48,17 +60,45 @@ namespace CabinPortraits.Video
                 case CabinPortraitVideoCycleController.FlowState.SystemInitializing:
                     InvokeSafely(onSystemInitializingEntered.Invoke, nameof(onSystemInitializingEntered), context);
                     break;
-                case CabinPortraitVideoCycleController.FlowState.ActivePreparing:
-                    InvokeSafely(onActivePreparingEntered.Invoke, nameof(onActivePreparingEntered), context);
+                case CabinPortraitVideoCycleController.FlowState.InitialPreparing:
+                    InvokeSafely(onInitialPreparingEntered.Invoke, nameof(onInitialPreparingEntered), context);
                     break;
-                case CabinPortraitVideoCycleController.FlowState.ActivePlaying:
-                    InvokeSafely(onActivePlayingEntered.Invoke, nameof(onActivePlayingEntered), context);
+                case CabinPortraitVideoCycleController.FlowState.Initial:
+                    InvokeSafely(onInitialEntered.Invoke, nameof(onInitialEntered), context);
                     break;
-                case CabinPortraitVideoCycleController.FlowState.Switching:
-                    InvokeSafely(onSwitchingEntered.Invoke, nameof(onSwitchingEntered), context);
+                case CabinPortraitVideoCycleController.FlowState.ManualVideoPreparing:
+                    InvokeSafely(onManualVideoPreparingEntered.Invoke, nameof(onManualVideoPreparingEntered), context);
                     break;
-                case CabinPortraitVideoCycleController.FlowState.CoveredPreparing:
-                    InvokeSafely(onCoveredPreparingEntered.Invoke, nameof(onCoveredPreparingEntered), context);
+                case CabinPortraitVideoCycleController.FlowState.ManualVideoPlaying:
+                    InvokeSafely(onManualVideoPlayingEntered.Invoke, nameof(onManualVideoPlayingEntered), context);
+                    break;
+                case CabinPortraitVideoCycleController.FlowState.TimerVideoPreparing:
+                    InvokeSafely(onTimerVideoPreparingEntered.Invoke, nameof(onTimerVideoPreparingEntered), context);
+                    break;
+                case CabinPortraitVideoCycleController.FlowState.TimerVideoPlaying:
+                    InvokeSafely(onTimerVideoPlayingEntered.Invoke, nameof(onTimerVideoPlayingEntered), context);
+                    break;
+                case CabinPortraitVideoCycleController.FlowState.ReturningToInitial:
+                    InvokeSafely(onReturningToInitialEntered.Invoke, nameof(onReturningToInitialEntered), context);
+                    if (source == CabinPortraitSwitchRequestSource.Auto)
+                    {
+                        InvokeSafely(onTimerReturningToInitialEntered.Invoke, nameof(onTimerReturningToInitialEntered), context);
+                    }
+                    else
+                    {
+                        InvokeSafely(onManualReturningToInitialEntered.Invoke, nameof(onManualReturningToInitialEntered), context);
+                    }
+                    break;
+                case CabinPortraitVideoCycleController.FlowState.CoveredRestoringInitial:
+                    InvokeSafely(onCoveredRestoringInitialEntered.Invoke, nameof(onCoveredRestoringInitialEntered), context);
+                    if (source == CabinPortraitSwitchRequestSource.Auto)
+                    {
+                        InvokeSafely(onTimerCoveredRestoringInitialEntered.Invoke, nameof(onTimerCoveredRestoringInitialEntered), context);
+                    }
+                    else
+                    {
+                        InvokeSafely(onManualCoveredRestoringInitialEntered.Invoke, nameof(onManualCoveredRestoringInitialEntered), context);
+                    }
                     break;
                 case CabinPortraitVideoCycleController.FlowState.ErrorRecovery:
                     InvokeSafely(onErrorRecoveryEntered.Invoke, nameof(onErrorRecoveryEntered), context);
@@ -96,43 +136,58 @@ namespace CabinPortraits.Video
         public enum FlowState
         {
             SystemInitializing,
-            ActivePreparing,
-            ActivePlaying,
-            Switching,
-            CoveredPreparing,
+            InitialPreparing,
+            Initial,
+            ManualVideoPreparing,
+            ManualVideoPlaying,
+            TimerVideoPreparing,
+            TimerVideoPlaying,
+            ReturningToInitial,
+            CoveredRestoringInitial,
             ErrorRecovery
         }
 
         private static readonly FlowState[] StateSequence =
         {
             FlowState.SystemInitializing,
-            FlowState.ActivePreparing,
-            FlowState.ActivePlaying,
-            FlowState.Switching,
-            FlowState.CoveredPreparing,
+            FlowState.InitialPreparing,
+            FlowState.Initial,
+            FlowState.ManualVideoPreparing,
+            FlowState.ManualVideoPlaying,
+            FlowState.TimerVideoPreparing,
+            FlowState.TimerVideoPlaying,
+            FlowState.ReturningToInitial,
+            FlowState.CoveredRestoringInitial,
             FlowState.ErrorRecovery
         };
 
         [Header("Config")]
-        [SerializeField, Tooltip("Video path list and timing settings.")]
+        [SerializeField, Tooltip("Video path lists and timing settings.")]
         private CabinPortraitVideoSequenceConfig sequenceConfig;
 
-        [Header("Players")]
-        [SerializeField, Tooltip("First persistent VideoPlayer. Assign its own RenderTexture as Target Texture.")]
+        [Header("Manual Players")]
+        [SerializeField, Tooltip("First persistent manual VideoPlayer. Assign its own RenderTexture as Target Texture.")]
         private VideoPlayer videoPlayerA;
 
-        [SerializeField, Tooltip("Second persistent VideoPlayer. Assign its own RenderTexture as Target Texture.")]
+        [SerializeField, Tooltip("Second persistent manual VideoPlayer. Assign its own RenderTexture as Target Texture.")]
         private VideoPlayer videoPlayerB;
 
+        [Header("Timer Players")]
+        [SerializeField, Tooltip("Optional first persistent timer VideoPlayer. Leave empty to fall back to the manual player pipeline.")]
+        private VideoPlayer timerVideoPlayerA;
+
+        [SerializeField, Tooltip("Optional second persistent timer VideoPlayer. Leave empty to fall back to the manual player pipeline.")]
+        private VideoPlayer timerVideoPlayerB;
+
         [Header("Display")]
-        [SerializeField, Tooltip("Renderer display switcher for the active player texture.")]
+        [SerializeField, Tooltip("Renderer display switcher for the active video texture and the initial static Quad.")]
         private CabinPortraitVideoDisplayController displayController;
 
         [Header("Input")]
         [SerializeField, Tooltip("When enabled, the controller listens for the configured key in Update.")]
         private bool enableKeyboardInput = true;
 
-        [SerializeField, Tooltip("Key used to request the next video. Enter accepts both Return and Keypad Enter.")]
+        [SerializeField, Tooltip("Key used to request the next manual video. Enter accepts both Return and Keypad Enter.")]
         private CabinPortraitSwitchKey switchKey = CabinPortraitSwitchKey.Space;
 
         [Header("Runtime Debug")]
@@ -143,19 +198,35 @@ namespace CabinPortraits.Video
         private FlowState currentState = FlowState.SystemInitializing;
 
         [Header("Unity Events")]
-        [SerializeField, Tooltip("Invoked when a manual switch request is accepted. Args: current index, next index.")]
+        [SerializeField, Tooltip("Invoked when a manual video request is accepted. Args: previous manual index, next manual index.")]
         private CabinPortraitVideoSwitchEvent onSwitchRequested = new CabinPortraitVideoSwitchEvent();
 
-        [SerializeField, Tooltip("Invoked when an automatic switch request is accepted. Args: current index, next index.")]
-        private CabinPortraitVideoSwitchEvent onAutoSwitchRequested = new CabinPortraitVideoSwitchEvent();
+        [SerializeField, Tooltip("Invoked when a timer video request is accepted. Args: previous timer index, next timer index.")]
+        [FormerlySerializedAs("onAutoSwitchRequested")]
+        private CabinPortraitVideoSwitchEvent onTimerVideoRequested = new CabinPortraitVideoSwitchEvent();
 
-        [SerializeField, Tooltip("Invoked before waiting Transition Cover Delay. Start the covering transition here.")]
-        private UnityEvent onTransitionStarted = new UnityEvent();
+        [SerializeField, Tooltip("Invoked when a manual button video reaches the configured remaining seconds before end.")]
+        [FormerlySerializedAs("onTransitionStarted")]
+        private UnityEvent onManualTransitionStarted = new UnityEvent();
 
-        [SerializeField, Tooltip("Invoked after the next video is visible behind the fully covered transition. Reveal the mask here.")]
-        private CabinPortraitVideoIndexEvent onReadyToReveal = new CabinPortraitVideoIndexEvent();
+        [SerializeField, Tooltip("Invoked when a timer video reaches the configured remaining seconds before end.")]
+        private UnityEvent onTimerTransitionStarted = new UnityEvent();
 
-        [SerializeField, Tooltip("Invoked after the active visible video index changes.")]
+        [SerializeField, Tooltip("Invoked after the initial static display is restored behind a fully covered manual transition. Arg: completed manual video index.")]
+        [FormerlySerializedAs("onReadyToReveal")]
+        private CabinPortraitVideoIndexEvent onManualReadyToReveal = new CabinPortraitVideoIndexEvent();
+
+        [SerializeField, Tooltip("Invoked after the initial static display is restored behind a fully covered timer transition. Arg: completed timer video index.")]
+        private CabinPortraitVideoIndexEvent onTimerReadyToReveal = new CabinPortraitVideoIndexEvent();
+
+        [SerializeField, Tooltip("Invoked after the initial static display is restored behind a fully covered manual transition.")]
+        [FormerlySerializedAs("onInitialReadyToReveal")]
+        private UnityEvent onManualInitialReadyToReveal = new UnityEvent();
+
+        [SerializeField, Tooltip("Invoked after the initial static display is restored behind a fully covered timer transition.")]
+        private UnityEvent onTimerInitialReadyToReveal = new UnityEvent();
+
+        [SerializeField, Tooltip("Invoked after the active visible video index changes. Timer and manual sequences have independent index ranges.")]
         private CabinPortraitVideoIndexEvent onVideoIndexChanged = new CabinPortraitVideoIndexEvent();
 
         [SerializeField, Tooltip("Invoked when a video has been prepared to its first frame.")]
@@ -164,13 +235,19 @@ namespace CabinPortraits.Video
         [SerializeField, Tooltip("Invoked when a video starts playing visibly.")]
         private CabinPortraitVideoIndexEvent onVideoStarted = new CabinPortraitVideoIndexEvent();
 
+        [SerializeField, Tooltip("Invoked when a manual button video starts playing visibly. Arg: manual video index.")]
+        private CabinPortraitVideoIndexEvent onManualVideoStarted = new CabinPortraitVideoIndexEvent();
+
+        [SerializeField, Tooltip("Invoked when a timer video starts playing visibly. Arg: timer video index.")]
+        private CabinPortraitVideoIndexEvent onTimerVideoStarted = new CabinPortraitVideoIndexEvent();
+
         [SerializeField, Tooltip("Invoked when a switch request is ignored. Reason is provided for debugging.")]
         private CabinPortraitVideoMessageEvent onInputRejected = new CabinPortraitVideoMessageEvent();
 
-        [SerializeField, Tooltip("Invoked when input is locked for startup or switching.")]
+        [SerializeField, Tooltip("Invoked when input is locked for startup, playback, or transition.")]
         private UnityEvent onInputLocked = new UnityEvent();
 
-        [SerializeField, Tooltip("Invoked when input is unlocked after startup or switching.")]
+        [SerializeField, Tooltip("Invoked when input is unlocked after returning to the initial screen.")]
         private UnityEvent onInputUnlocked = new UnityEvent();
 
         [SerializeField] private CabinPortraitVideoMessageEvent onVideoError = new CabinPortraitVideoMessageEvent();
@@ -193,6 +270,7 @@ namespace CabinPortraits.Video
             public bool IsPreparing;
             public bool IsReady;
             public bool IsPlaying;
+            public bool PlaybackCompleted;
             public bool FirstFrameReceived;
             public bool PrimingAudioMuted;
             public bool PrimingDirectAudioWasMuted;
@@ -207,23 +285,35 @@ namespace CabinPortraits.Video
 
         private PlayerSlotState slotAState;
         private PlayerSlotState slotBState;
+        private PlayerSlotState timerSlotAState;
+        private PlayerSlotState timerSlotBState;
         private PlayerSlotState activeSlot;
         private PlayerSlotState inactiveSlot;
         private Coroutine startupCoroutine;
         private Coroutine switchCoroutine;
         private int tokenCounter;
         private int currentIndex = -1;
+        private int nextManualIndex;
+        private int nextTimerIndex;
+        private int lastManualIndex = -1;
+        private int lastTimerIndex = -1;
         private bool initialized;
         private bool inputLocked;
         private bool isSwitching;
-        private float nextAutoSwitchAt = -1f;
-        private float lastAutoSwitchInterval = -1f;
+        private float nextTimerVideoAt = -1f;
+        private float lastTimerVideoDelay = -1f;
+        private CabinPortraitSwitchRequestSource activeRequestSource = CabinPortraitSwitchRequestSource.ManualInput;
 
         public int CurrentIndex => currentIndex;
+        public int NextManualIndex => nextManualIndex;
+        public int NextTimerIndex => nextTimerIndex;
+        public int LastManualIndex => lastManualIndex;
+        public int LastTimerIndex => lastTimerIndex;
         public FlowState CurrentState => currentState;
         public bool IsInitialized => initialized;
         public bool IsSwitching => isSwitching;
-        public bool CanSwitch => CanAcceptSwitchRequest(out _);
+        public bool IsPlaybackActive => currentState == FlowState.ManualVideoPlaying || currentState == FlowState.TimerVideoPlaying;
+        public bool CanSwitch => CanAcceptSwitchRequest(CabinPortraitSwitchRequestSource.ManualInput, out _);
 
         public event Action<FlowState, FlowState> StateChanged;
 
@@ -237,6 +327,8 @@ namespace CabinPortraits.Video
             InitializeSlotReferences();
             Subscribe(videoPlayerA);
             Subscribe(videoPlayerB);
+            Subscribe(timerVideoPlayerA);
+            Subscribe(timerVideoPlayerB);
         }
 
         private void Start()
@@ -251,13 +343,10 @@ namespace CabinPortraits.Video
         {
             if (enableKeyboardInput && IsSwitchKeyDown())
             {
-                if (RequestNextVideo())
-                {
-                    return;
-                }
+                RequestNextVideo();
             }
 
-            UpdateAutoSwitch();
+            UpdateTimerVideoRequest();
         }
 
         private bool IsSwitchKeyDown()
@@ -276,6 +365,8 @@ namespace CabinPortraits.Video
         {
             Unsubscribe(videoPlayerA);
             Unsubscribe(videoPlayerB);
+            Unsubscribe(timerVideoPlayerA);
+            Unsubscribe(timerVideoPlayerB);
             StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
             RestorePrimingAudioForSlots();
@@ -295,43 +386,28 @@ namespace CabinPortraits.Video
 
             StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
-            StopSlot(slotAState);
-            StopSlot(slotBState);
+            StopAllSlots();
 
             initialized = true;
-            inputLocked = true;
             isSwitching = false;
-            nextAutoSwitchAt = -1f;
-            lastAutoSwitchInterval = -1f;
+            activeRequestSource = CabinPortraitSwitchRequestSource.ManualInput;
             currentIndex = -1;
-            activeSlot = slotAState;
-            inactiveSlot = slotBState;
+            nextManualIndex = sequenceConfig.StartIndex;
+            nextTimerIndex = sequenceConfig.TimerStartIndex;
+            lastManualIndex = -1;
+            lastTimerIndex = -1;
+            activeSlot = GetFirstAvailableSlot(CabinPortraitSwitchRequestSource.ManualInput);
+            inactiveSlot = GetOtherSlot(CabinPortraitSwitchRequestSource.ManualInput, activeSlot);
+            ClearTimerVideoSchedule();
             EnterStateDirectly(FlowState.SystemInitializing);
 
-            onInputLocked.Invoke();
-            startupCoroutine = StartCoroutine(InitializeAndPlayRoutine());
+            SetInputLocked(true);
+            startupCoroutine = StartCoroutine(InitializeAndShowInitialRoutine());
         }
 
         public bool RequestNextVideo()
         {
             return RequestNextVideo(CabinPortraitSwitchRequestSource.ManualInput);
-        }
-
-        private bool RequestNextVideo(CabinPortraitSwitchRequestSource source)
-        {
-            if (!CanAcceptSwitchRequest(out string rejectionReason))
-            {
-                if (ShouldLog)
-                {
-                    Debug.Log($"[CabinPortraits.Video] Ignored {DescribeSwitchRequestSource(source)} switch request. {rejectionReason}", this);
-                }
-
-                onInputRejected.Invoke(rejectionReason);
-                return false;
-            }
-
-            switchCoroutine = StartCoroutine(SwitchRoutine(source));
-            return true;
         }
 
         public void ResetToStart()
@@ -342,16 +418,15 @@ namespace CabinPortraits.Video
         public void StopAllVideos()
         {
             initialized = false;
-            inputLocked = false;
             isSwitching = false;
-            nextAutoSwitchAt = -1f;
-            lastAutoSwitchInterval = -1f;
+            activeRequestSource = CabinPortraitSwitchRequestSource.ManualInput;
             currentIndex = -1;
+            ClearTimerVideoSchedule();
             EnterStateDirectly(FlowState.SystemInitializing);
             StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
-            StopSlot(slotAState);
-            StopSlot(slotBState);
+            StopAllSlots();
+            SetInputLocked(false);
 
             if (displayController != null)
             {
@@ -359,57 +434,112 @@ namespace CabinPortraits.Video
             }
         }
 
-        private IEnumerator InitializeAndPlayRoutine()
+        private IEnumerator InitializeAndShowInitialRoutine()
         {
-            if (!TransitionTo(FlowState.ActivePreparing))
+            if (!TransitionTo(FlowState.InitialPreparing))
             {
-                UnlockInput();
+                SetInputLocked(false);
                 yield break;
             }
 
-            yield return PrepareSlotForFirstFrame(activeSlot, sequenceConfig.StartIndex);
+            ShowInitialDisplay();
 
-            if (currentState == FlowState.ErrorRecovery || activeSlot == null || !activeSlot.IsReady)
+            if (!TransitionTo(FlowState.Initial))
             {
-                UnlockInput();
+                SetInputLocked(false);
                 yield break;
             }
 
-            if (!PlayVisibleSlot(activeSlot))
-            {
-                UnlockInput();
-                yield break;
-            }
-
-            currentIndex = activeSlot.VideoIndex;
-            onVideoIndexChanged.Invoke(currentIndex);
-            TransitionTo(FlowState.ActivePlaying);
-            ScheduleNextAutoSwitch();
-            UnlockInput();
+            ScheduleNextTimerVideo();
+            SetInputLocked(false);
             startupCoroutine = null;
         }
 
-        private IEnumerator SwitchRoutine(CabinPortraitSwitchRequestSource source)
+        private bool RequestNextVideo(CabinPortraitSwitchRequestSource source)
         {
-            float acceptedAt = Time.unscaledTime;
-            inputLocked = true;
-            isSwitching = true;
-            onInputLocked.Invoke();
-
-            PlayerSlotState previousActiveSlot = activeSlot;
-            PlayerSlotState nextActiveSlot = inactiveSlot;
-            int previousIndex = currentIndex;
-            int nextIndex = sequenceConfig.GetNextIndex(currentIndex);
-
-            InvokeSwitchRequested(source, previousIndex, nextIndex);
-
-            if (!TransitionTo(FlowState.Switching))
+            if (!CanAcceptSwitchRequest(source, out string rejectionReason))
             {
-                UnlockSwitchAfterFailure();
+                if (ShouldLog)
+                {
+                    Debug.Log($"[CabinPortraits.Video] Ignored {DescribeSwitchRequestSource(source)} request. {rejectionReason}", this);
+                }
+
+                onInputRejected.Invoke(rejectionReason);
+                return false;
+            }
+
+            int previousIndex = GetLastIndex(source);
+            int nextIndex = GetNextIndex(source);
+            InvokeSwitchRequested(source, previousIndex, nextIndex);
+            ClearTimerVideoSchedule();
+            switchCoroutine = StartCoroutine(PlaySingleVideoRoutine(source, nextIndex));
+            return true;
+        }
+
+        private IEnumerator PlaySingleVideoRoutine(CabinPortraitSwitchRequestSource source, int requestedIndex)
+        {
+            SetInputLocked(true);
+            isSwitching = true;
+            activeRequestSource = source;
+
+            PlayerSlotState playbackSlot = GetFirstAvailableSlot(source);
+            PlayerSlotState standbySlot = GetOtherSlot(source, playbackSlot);
+            FlowState preparingState = GetPreparingState(source);
+            FlowState playingState = GetPlayingState(source);
+
+            StopSlot(playbackSlot);
+            StopSlot(standbySlot);
+
+            if (!TransitionTo(preparingState))
+            {
+                ReturnToInitialAfterFailure();
                 yield break;
             }
 
-            onTransitionStarted.Invoke();
+            yield return PrepareSlotForFirstFrame(playbackSlot, source, requestedIndex);
+
+            if (currentState == FlowState.ErrorRecovery || playbackSlot == null || !playbackSlot.IsReady)
+            {
+                ReturnToInitialAfterFailure();
+                yield break;
+            }
+
+            if (!PlayVisibleSlot(playbackSlot, source))
+            {
+                ReturnToInitialAfterFailure();
+                yield break;
+            }
+
+            activeSlot = playbackSlot;
+            inactiveSlot = standbySlot;
+            currentIndex = playbackSlot.VideoIndex;
+            SetLastIndex(source, currentIndex);
+            AdvanceNextIndex(source, currentIndex);
+            onVideoIndexChanged.Invoke(currentIndex);
+
+            if (!TransitionTo(playingState))
+            {
+                ReturnToInitialAfterFailure();
+                yield break;
+            }
+
+            int playbackToken = playbackSlot.Token;
+            yield return WaitForReturnTransitionTrigger(playbackSlot, playbackToken);
+
+            if (currentState == FlowState.ErrorRecovery || playbackSlot == null || playbackSlot.Token != playbackToken)
+            {
+                ReturnToInitialAfterFailure();
+                yield break;
+            }
+
+            int completedIndex = currentIndex;
+            if (!TransitionTo(FlowState.ReturningToInitial))
+            {
+                ReturnToInitialAfterFailure();
+                yield break;
+            }
+
+            InvokeTransitionStarted(source);
 
             float transitionDelay = sequenceConfig != null ? sequenceConfig.TransitionCoverDelay : 0.5f;
             if (transitionDelay > 0f)
@@ -417,134 +547,150 @@ namespace CabinPortraits.Video
                 yield return new WaitForSecondsRealtime(transitionDelay);
             }
 
-            if (currentState != FlowState.Switching)
+            if (currentState != FlowState.ReturningToInitial)
             {
-                UnlockSwitchAfterFailure();
+                ReturnToInitialAfterFailure();
                 yield break;
             }
 
-            if (!TransitionTo(FlowState.CoveredPreparing))
+            if (!TransitionTo(FlowState.CoveredRestoringInitial))
             {
-                UnlockSwitchAfterFailure();
+                ReturnToInitialAfterFailure();
                 yield break;
             }
 
-            StopSlot(previousActiveSlot);
-            yield return PrepareSlotForFirstFrame(nextActiveSlot, nextIndex);
+            StopSlot(playbackSlot);
+            ShowInitialDisplay();
+            currentIndex = -1;
+            InvokeReadyToReveal(source, completedIndex);
 
-            if (currentState == FlowState.ErrorRecovery || nextActiveSlot == null || !nextActiveSlot.IsReady)
+            if (!TransitionTo(FlowState.Initial))
             {
-                UnlockSwitchAfterFailure();
+                ReturnToInitialAfterFailure();
                 yield break;
             }
 
-            if (!PlayVisibleSlot(nextActiveSlot))
-            {
-                UnlockSwitchAfterFailure();
-                yield break;
-            }
-
-            activeSlot = nextActiveSlot;
-            inactiveSlot = previousActiveSlot;
-            currentIndex = nextIndex;
-            onVideoIndexChanged.Invoke(currentIndex);
-            onReadyToReveal.Invoke(currentIndex);
-
-            TransitionTo(FlowState.ActivePlaying);
             isSwitching = false;
-            yield return WaitForRemainingSwitchCooldown(acceptedAt);
-            UnlockInput();
-            ScheduleNextAutoSwitch();
             switchCoroutine = null;
+            ScheduleNextTimerVideo();
+            SetInputLocked(false);
         }
 
-        private IEnumerator WaitForRemainingSwitchCooldown(float acceptedAt)
+        private IEnumerator WaitForReturnTransitionTrigger(PlayerSlotState state, int token)
         {
-            float cooldown = sequenceConfig != null ? sequenceConfig.SwitchInputCooldown : 0f;
-            float remaining = Mathf.Max(0f, cooldown - (Time.unscaledTime - acceptedAt));
-
-            if (remaining > 0f)
+            while (state != null &&
+                   state.Token == token &&
+                   currentState != FlowState.ErrorRecovery &&
+                   !ShouldStartReturnTransition(state))
             {
-                yield return new WaitForSecondsRealtime(remaining);
+                yield return null;
             }
         }
 
-        private void UpdateAutoSwitch()
+        private bool ShouldStartReturnTransition(PlayerSlotState state)
         {
-            if (sequenceConfig == null || sequenceConfig.AutoSwitchInterval <= 0f)
+            if (state == null || state.Player == null)
             {
-                nextAutoSwitchAt = -1f;
-                lastAutoSwitchInterval = -1f;
+                return true;
+            }
+
+            if (state.PlaybackCompleted)
+            {
+                return true;
+            }
+
+            VideoPlayer player = state.Player;
+            float leadSeconds = sequenceConfig != null ? sequenceConfig.TransitionTriggerBeforeVideoEnd : 0f;
+            if (leadSeconds > 0f && TryGetRemainingSeconds(player, out double remainingSeconds))
+            {
+                return remainingSeconds <= leadSeconds;
+            }
+
+            return !player.isPlaying && player.time > 0d;
+        }
+
+        private static bool TryGetRemainingSeconds(VideoPlayer player, out double remainingSeconds)
+        {
+            remainingSeconds = double.PositiveInfinity;
+
+            if (player == null)
+            {
+                return false;
+            }
+
+            double length = player.length;
+            if (length > 0d && !double.IsNaN(length) && !double.IsInfinity(length))
+            {
+                remainingSeconds = Math.Max(0d, length - player.time);
+                return true;
+            }
+
+            if (player.frameCount > 0UL && player.frameRate > 0d && player.frame >= 0L)
+            {
+                remainingSeconds = Math.Max(0d, ((double)player.frameCount - player.frame) / player.frameRate);
+                return true;
+            }
+
+            return false;
+        }
+
+        private void UpdateTimerVideoRequest()
+        {
+            if (sequenceConfig == null || sequenceConfig.TimerVideoDelay <= 0f || sequenceConfig.TimerVideoCount <= 0)
+            {
+                ClearTimerVideoSchedule();
                 return;
             }
 
-            if (!initialized || currentState != FlowState.ActivePlaying || inputLocked || isSwitching)
+            if (!initialized || currentState != FlowState.Initial || inputLocked || isSwitching)
             {
                 return;
             }
 
-            if (!Mathf.Approximately(lastAutoSwitchInterval, sequenceConfig.AutoSwitchInterval) || nextAutoSwitchAt < 0f)
+            if (!Mathf.Approximately(lastTimerVideoDelay, sequenceConfig.TimerVideoDelay) || nextTimerVideoAt < 0f)
             {
-                ScheduleNextAutoSwitch();
+                ScheduleNextTimerVideo();
                 return;
             }
 
-            if (Time.unscaledTime < nextAutoSwitchAt)
+            if (Time.unscaledTime < nextTimerVideoAt)
             {
                 return;
             }
 
             if (ShouldLog)
             {
-                Debug.Log($"[CabinPortraits.Video] Auto switch interval reached after {sequenceConfig.AutoSwitchInterval:0.##} seconds.", this);
+                Debug.Log($"[CabinPortraits.Video] Idle timer reached after {sequenceConfig.TimerVideoDelay:0.##} seconds.", this);
             }
 
             if (!RequestNextVideo(CabinPortraitSwitchRequestSource.Auto))
             {
-                ScheduleNextAutoSwitch();
+                ScheduleNextTimerVideo();
             }
         }
 
-        private void ScheduleNextAutoSwitch()
+        private void ScheduleNextTimerVideo()
         {
-            if (sequenceConfig == null || sequenceConfig.AutoSwitchInterval <= 0f)
+            if (sequenceConfig == null ||
+                sequenceConfig.TimerVideoDelay <= 0f ||
+                sequenceConfig.TimerVideoCount <= 0 ||
+                currentState != FlowState.Initial)
             {
-                nextAutoSwitchAt = -1f;
-                lastAutoSwitchInterval = -1f;
+                ClearTimerVideoSchedule();
                 return;
             }
 
-            lastAutoSwitchInterval = sequenceConfig.AutoSwitchInterval;
-            nextAutoSwitchAt = Time.unscaledTime + sequenceConfig.AutoSwitchInterval;
+            lastTimerVideoDelay = sequenceConfig.TimerVideoDelay;
+            nextTimerVideoAt = Time.unscaledTime + sequenceConfig.TimerVideoDelay;
         }
 
-        private void InvokeSwitchRequested(CabinPortraitSwitchRequestSource source, int previousIndex, int nextIndex)
+        private void ClearTimerVideoSchedule()
         {
-            switch (source)
-            {
-                case CabinPortraitSwitchRequestSource.Auto:
-                    onAutoSwitchRequested.Invoke(previousIndex, nextIndex);
-                    break;
-                case CabinPortraitSwitchRequestSource.ManualInput:
-                default:
-                    onSwitchRequested.Invoke(previousIndex, nextIndex);
-                    break;
-            }
+            nextTimerVideoAt = -1f;
+            lastTimerVideoDelay = -1f;
         }
 
-        private static string DescribeSwitchRequestSource(CabinPortraitSwitchRequestSource source)
-        {
-            switch (source)
-            {
-                case CabinPortraitSwitchRequestSource.Auto:
-                    return "auto";
-                case CabinPortraitSwitchRequestSource.ManualInput:
-                default:
-                    return "manual";
-            }
-        }
-
-        private bool CanAcceptSwitchRequest(out string rejectionReason)
+        private bool CanAcceptSwitchRequest(CabinPortraitSwitchRequestSource source, out string rejectionReason)
         {
             rejectionReason = string.Empty;
 
@@ -554,42 +700,43 @@ namespace CabinPortraits.Video
                 return false;
             }
 
-            if (sequenceConfig == null || sequenceConfig.VideoCount <= 1)
+            if (sequenceConfig == null)
             {
-                rejectionReason = "Sequence needs at least two video paths.";
+                rejectionReason = "Sequence config is missing.";
+                return false;
+            }
+
+            CabinPortraitVideoSequenceKind sequenceKind = GetSequenceKind(source);
+            if (sequenceConfig.GetVideoCount(sequenceKind) <= 0)
+            {
+                rejectionReason = $"{DescribeSwitchRequestSource(source)} sequence has no video paths.";
                 return false;
             }
 
             if (inputLocked || isSwitching)
             {
-                rejectionReason = "Input is locked or a switch is already running.";
+                rejectionReason = "Input is locked or playback is already running.";
                 return false;
             }
 
-            if (currentState != FlowState.ActivePlaying)
+            if (currentState != FlowState.Initial)
             {
-                rejectionReason = $"Flow state is {currentState}. Expected {FlowState.ActivePlaying}.";
+                rejectionReason = $"Flow state is {currentState}. Expected {FlowState.Initial}.";
                 return false;
             }
 
-            if (activeSlot == null || !activeSlot.IsPlaying)
+            if (GetFirstAvailableSlot(source) == null)
             {
-                rejectionReason = "No active video is playing yet.";
-                return false;
-            }
-
-            if (inactiveSlot == null || inactiveSlot.Player == null)
-            {
-                rejectionReason = "Inactive VideoPlayer is missing.";
+                rejectionReason = "No VideoPlayer is assigned.";
                 return false;
             }
 
             return true;
         }
 
-        private IEnumerator PrepareSlotForFirstFrame(PlayerSlotState state, int videoIndex)
+        private IEnumerator PrepareSlotForFirstFrame(PlayerSlotState state, CabinPortraitSwitchRequestSource source, int videoIndex)
         {
-            if (!TryBeginPrepareSlot(state, videoIndex, out int token))
+            if (!TryBeginPrepareSlot(state, source, videoIndex, out int token))
             {
                 yield break;
             }
@@ -605,7 +752,7 @@ namespace CabinPortraits.Video
                 {
                     prepareWarningLogged = true;
                     Debug.LogWarning(
-                        $"[CabinPortraits.Video] Prepare is still waiting after {prepareWarningTimeout:0.##} seconds for index {state.VideoIndex}. Continuing without entering ErrorRecovery.\n{state.FullPath}",
+                        $"[CabinPortraits.Video] Prepare is still waiting after {prepareWarningTimeout:0.##} seconds for {DescribeSwitchRequestSource(source)} index {state.VideoIndex}. Continuing without entering ErrorRecovery.\n{state.FullPath}",
                         this);
                 }
 
@@ -638,7 +785,7 @@ namespace CabinPortraits.Video
                 {
                     firstFrameWarningLogged = true;
                     Debug.LogWarning(
-                        $"[CabinPortraits.Video] First frame is still waiting after {firstFrameWarningTimeout:0.##} seconds for index {state.VideoIndex}. Continuing without entering ErrorRecovery.\n{state.FullPath}",
+                        $"[CabinPortraits.Video] First frame is still waiting after {firstFrameWarningTimeout:0.##} seconds for {DescribeSwitchRequestSource(source)} index {state.VideoIndex}. Continuing without entering ErrorRecovery.\n{state.FullPath}",
                         this);
                 }
 
@@ -659,18 +806,19 @@ namespace CabinPortraits.Video
             state.IsPreparing = false;
             state.IsReady = true;
             state.IsPlaying = false;
+            state.PlaybackCompleted = false;
             onVideoPrepared.Invoke(state.VideoIndex);
 
             if (ShouldLog)
             {
                 Debug.Log(
-                    $"[CabinPortraits.Video] First frame ready for index {state.VideoIndex} on Player {state.Slot}. " +
+                    $"[CabinPortraits.Video] First frame ready for {DescribeSwitchRequestSource(source)} index {state.VideoIndex} on Player {state.Slot}. " +
                     $"FrameReady={state.FirstFrameIndex}, PlayerFrame={player.frame}, Time={player.time:0.###}, TargetTexture={DescribeTexture(player.targetTexture)}, PlayerTexture={DescribeTexture(player.texture)}.",
                     this);
             }
         }
 
-        private bool TryBeginPrepareSlot(PlayerSlotState state, int videoIndex, out int token)
+        private bool TryBeginPrepareSlot(PlayerSlotState state, CabinPortraitSwitchRequestSource source, int videoIndex, out int token)
         {
             token = 0;
 
@@ -680,9 +828,10 @@ namespace CabinPortraits.Video
                 return false;
             }
 
-            if (!sequenceConfig.TryGetVideoPath(videoIndex, out string relativePath))
+            CabinPortraitVideoSequenceKind sequenceKind = GetSequenceKind(source);
+            if (!sequenceConfig.TryGetVideoPath(sequenceKind, videoIndex, out string relativePath))
             {
-                ReportFailure($"Missing video path at index {videoIndex}.");
+                ReportFailure($"Missing {DescribeSwitchRequestSource(source)} video path at index {videoIndex}.");
                 return false;
             }
 
@@ -702,10 +851,11 @@ namespace CabinPortraits.Video
             StopSlot(state);
             token = ++tokenCounter;
             state.Token = token;
-            state.VideoIndex = sequenceConfig.WrapIndex(videoIndex);
+            state.VideoIndex = sequenceConfig.WrapIndex(sequenceKind, videoIndex);
             state.IsPreparing = true;
             state.IsReady = false;
             state.IsPlaying = false;
+            state.PlaybackCompleted = false;
             state.FirstFrameReceived = false;
             state.FirstFrameIndex = -1;
             state.RelativePath = relativePath;
@@ -720,7 +870,7 @@ namespace CabinPortraits.Video
             if (ShouldLog)
             {
                 Debug.Log(
-                    $"[CabinPortraits.Video] Preparing index {state.VideoIndex} on Player {state.Slot}. " +
+                    $"[CabinPortraits.Video] Preparing {DescribeSwitchRequestSource(source)} index {state.VideoIndex} on Player {state.Slot}. " +
                     $"RenderMode={state.Player.renderMode}, TargetTexture={DescribeTexture(state.Player.targetTexture)}, " +
                     $"URL={fileUri}\nFullPath={fullPath}",
                     this);
@@ -729,7 +879,7 @@ namespace CabinPortraits.Video
             return true;
         }
 
-        private bool PlayVisibleSlot(PlayerSlotState state)
+        private bool PlayVisibleSlot(PlayerSlotState state, CabinPortraitSwitchRequestSource source)
         {
             if (state == null || state.Player == null || !state.IsReady || !state.Player.isPrepared)
             {
@@ -738,8 +888,9 @@ namespace CabinPortraits.Video
             }
 
             RestorePrimingAudio(state);
-            state.Player.isLooping = true;
+            state.Player.isLooping = false;
             state.Player.sendFrameReadyEvents = false;
+            state.PlaybackCompleted = false;
 
             if (!state.Player.isPlaying)
             {
@@ -750,19 +901,19 @@ namespace CabinPortraits.Video
 
             if (displayController != null)
             {
-                displayController.ShowSlot(state.Slot, GetTargetTexture(state));
+                displayController.ShowSlot(GetSequenceKind(source), state.Slot, GetTargetTexture(state));
             }
 
             if (ShouldLog)
             {
                 Debug.Log(
-                    $"[CabinPortraits.Video] Playing visible index {state.VideoIndex} on Player {state.Slot}. " +
+                    $"[CabinPortraits.Video] Playing visible {DescribeSwitchRequestSource(source)} index {state.VideoIndex} once on Player {state.Slot}. " +
                     $"RenderMode={state.Player.renderMode}, TargetTexture={DescribeTexture(state.Player.targetTexture)}, " +
                     $"PlayerTexture={DescribeTexture(state.Player.texture)}, DisplayTexture={DescribeTexture(GetTargetTexture(state))}.",
                     this);
             }
 
-            onVideoStarted.Invoke(state.VideoIndex);
+            InvokeVideoStarted(source, state.VideoIndex);
             return true;
         }
 
@@ -771,7 +922,7 @@ namespace CabinPortraits.Video
             player.source = VideoSource.Url;
             player.playOnAwake = false;
             player.waitForFirstFrame = true;
-            player.isLooping = true;
+            player.isLooping = false;
             player.skipOnDrop = false;
             player.sendFrameReadyEvents = true;
         }
@@ -795,12 +946,21 @@ namespace CabinPortraits.Video
             state.IsPreparing = false;
             state.IsReady = false;
             state.IsPlaying = false;
+            state.PlaybackCompleted = false;
             state.FirstFrameReceived = false;
             state.FirstFrameIndex = -1;
             state.VideoIndex = -1;
             state.RelativePath = string.Empty;
             state.FullPath = string.Empty;
             state.Url = string.Empty;
+        }
+
+        private void StopAllSlots()
+        {
+            StopSlot(slotAState);
+            StopSlot(slotBState);
+            StopSlot(timerSlotAState);
+            StopSlot(timerSlotBState);
         }
 
         private void ApplyPrimingAudioMute(PlayerSlotState state)
@@ -887,6 +1047,29 @@ namespace CabinPortraits.Video
         {
             RestorePrimingAudio(slotAState);
             RestorePrimingAudio(slotBState);
+            RestorePrimingAudio(timerSlotAState);
+            RestorePrimingAudio(timerSlotBState);
+        }
+
+        private void ReturnToInitialAfterFailure()
+        {
+            StopAllSlots();
+            ShowInitialDisplay();
+            currentIndex = -1;
+            isSwitching = false;
+            switchCoroutine = null;
+
+            if (currentState == FlowState.ErrorRecovery && TransitionTo(FlowState.InitialPreparing))
+            {
+                TransitionTo(FlowState.Initial);
+            }
+            else if (currentState != FlowState.Initial)
+            {
+                EnterStateDirectly(FlowState.Initial);
+            }
+
+            ScheduleNextTimerVideo();
+            SetInputLocked(false);
         }
 
         private void ReportFailure(string message)
@@ -900,24 +1083,38 @@ namespace CabinPortraits.Video
             }
         }
 
-        private void UnlockInput()
+        private void ShowInitialDisplay()
         {
-            inputLocked = false;
-            onInputUnlocked.Invoke();
+            if (displayController != null)
+            {
+                displayController.ShowInitial();
+            }
         }
 
-        private void UnlockSwitchAfterFailure()
+        private void SetInputLocked(bool locked)
         {
-            isSwitching = false;
-            inputLocked = false;
-            onInputUnlocked.Invoke();
-            switchCoroutine = null;
+            if (inputLocked == locked)
+            {
+                return;
+            }
+
+            inputLocked = locked;
+            if (locked)
+            {
+                onInputLocked.Invoke();
+            }
+            else
+            {
+                onInputUnlocked.Invoke();
+            }
         }
 
         private void InitializeSlotReferences()
         {
             slotAState = UpdateSlotState(slotAState, videoPlayerA, CabinPortraitVideoSlot.A);
             slotBState = UpdateSlotState(slotBState, videoPlayerB, CabinPortraitVideoSlot.B);
+            timerSlotAState = UpdateSlotState(timerSlotAState, timerVideoPlayerA, CabinPortraitVideoSlot.A);
+            timerSlotBState = UpdateSlotState(timerSlotBState, timerVideoPlayerB, CabinPortraitVideoSlot.B);
         }
 
         private static PlayerSlotState UpdateSlotState(PlayerSlotState state, VideoPlayer player, CabinPortraitVideoSlot slot)
@@ -937,6 +1134,92 @@ namespace CabinPortraits.Video
             return state;
         }
 
+        private PlayerSlotState GetFirstAvailableSlot(CabinPortraitSwitchRequestSource source)
+        {
+            if (source == CabinPortraitSwitchRequestSource.Auto)
+            {
+                PlayerSlotState timerSlot = GetFirstAvailableTimerSlot();
+                if (timerSlot != null)
+                {
+                    return timerSlot;
+                }
+            }
+
+            return GetFirstAvailableManualSlot();
+        }
+
+        private PlayerSlotState GetFirstAvailableManualSlot()
+        {
+            if (activeSlot != null && activeSlot.Player != null &&
+                (activeSlot == slotAState || activeSlot == slotBState))
+            {
+                return activeSlot;
+            }
+
+            if (slotAState != null && slotAState.Player != null)
+            {
+                return slotAState;
+            }
+
+            if (slotBState != null && slotBState.Player != null)
+            {
+                return slotBState;
+            }
+
+            return null;
+        }
+
+        private PlayerSlotState GetFirstAvailableTimerSlot()
+        {
+            if (activeSlot != null && activeSlot.Player != null &&
+                (activeSlot == timerSlotAState || activeSlot == timerSlotBState))
+            {
+                return activeSlot;
+            }
+
+            if (timerSlotAState != null && timerSlotAState.Player != null)
+            {
+                return timerSlotAState;
+            }
+
+            if (timerSlotBState != null && timerSlotBState.Player != null)
+            {
+                return timerSlotBState;
+            }
+
+            return null;
+        }
+
+        private PlayerSlotState GetOtherSlot(CabinPortraitSwitchRequestSource source, PlayerSlotState slot)
+        {
+            if (source == CabinPortraitSwitchRequestSource.Auto && (timerSlotAState != null || timerSlotBState != null))
+            {
+                if (slot == timerSlotAState)
+                {
+                    return timerSlotBState;
+                }
+
+                if (slot == timerSlotBState)
+                {
+                    return timerSlotAState;
+                }
+
+                return timerSlotAState != null && timerSlotAState.Player != null ? timerSlotAState : timerSlotBState;
+            }
+
+            if (slot == slotAState)
+            {
+                return slotBState;
+            }
+
+            if (slot == slotBState)
+            {
+                return slotAState;
+            }
+
+            return slotAState != null && slotAState.Player != null ? slotAState : slotBState;
+        }
+
         private PlayerSlotState GetState(VideoPlayer player)
         {
             if (player == null)
@@ -954,7 +1237,145 @@ namespace CabinPortraits.Video
                 return slotBState;
             }
 
+            if (timerSlotAState != null && player == timerSlotAState.Player)
+            {
+                return timerSlotAState;
+            }
+
+            if (timerSlotBState != null && player == timerSlotBState.Player)
+            {
+                return timerSlotBState;
+            }
+
             return null;
+        }
+
+        private int GetNextIndex(CabinPortraitSwitchRequestSource source)
+        {
+            return source == CabinPortraitSwitchRequestSource.Auto ? nextTimerIndex : nextManualIndex;
+        }
+
+        private int GetLastIndex(CabinPortraitSwitchRequestSource source)
+        {
+            return source == CabinPortraitSwitchRequestSource.Auto ? lastTimerIndex : lastManualIndex;
+        }
+
+        private void SetLastIndex(CabinPortraitSwitchRequestSource source, int index)
+        {
+            if (source == CabinPortraitSwitchRequestSource.Auto)
+            {
+                lastTimerIndex = index;
+                return;
+            }
+
+            lastManualIndex = index;
+        }
+
+        private void AdvanceNextIndex(CabinPortraitSwitchRequestSource source, int currentPlaybackIndex)
+        {
+            CabinPortraitVideoSequenceKind sequenceKind = GetSequenceKind(source);
+            int nextIndex = sequenceConfig != null ? sequenceConfig.GetNextIndex(sequenceKind, currentPlaybackIndex) : 0;
+
+            if (source == CabinPortraitSwitchRequestSource.Auto)
+            {
+                nextTimerIndex = nextIndex;
+                return;
+            }
+
+            nextManualIndex = nextIndex;
+        }
+
+        private static CabinPortraitVideoSequenceKind GetSequenceKind(CabinPortraitSwitchRequestSource source)
+        {
+            return source == CabinPortraitSwitchRequestSource.Auto
+                ? CabinPortraitVideoSequenceKind.Timer
+                : CabinPortraitVideoSequenceKind.ManualInput;
+        }
+
+        private static FlowState GetPreparingState(CabinPortraitSwitchRequestSource source)
+        {
+            return source == CabinPortraitSwitchRequestSource.Auto
+                ? FlowState.TimerVideoPreparing
+                : FlowState.ManualVideoPreparing;
+        }
+
+        private static FlowState GetPlayingState(CabinPortraitSwitchRequestSource source)
+        {
+            return source == CabinPortraitSwitchRequestSource.Auto
+                ? FlowState.TimerVideoPlaying
+                : FlowState.ManualVideoPlaying;
+        }
+
+        private void InvokeSwitchRequested(CabinPortraitSwitchRequestSource source, int previousIndex, int nextIndex)
+        {
+            switch (source)
+            {
+                case CabinPortraitSwitchRequestSource.Auto:
+                    onTimerVideoRequested.Invoke(previousIndex, nextIndex);
+                    break;
+                case CabinPortraitSwitchRequestSource.ManualInput:
+                default:
+                    onSwitchRequested.Invoke(previousIndex, nextIndex);
+                    break;
+            }
+        }
+
+        private void InvokeTransitionStarted(CabinPortraitSwitchRequestSource source)
+        {
+            switch (source)
+            {
+                case CabinPortraitSwitchRequestSource.Auto:
+                    onTimerTransitionStarted.Invoke();
+                    break;
+                case CabinPortraitSwitchRequestSource.ManualInput:
+                default:
+                    onManualTransitionStarted.Invoke();
+                    break;
+            }
+        }
+
+        private void InvokeVideoStarted(CabinPortraitSwitchRequestSource source, int videoIndex)
+        {
+            onVideoStarted.Invoke(videoIndex);
+
+            switch (source)
+            {
+                case CabinPortraitSwitchRequestSource.Auto:
+                    onTimerVideoStarted.Invoke(videoIndex);
+                    break;
+                case CabinPortraitSwitchRequestSource.ManualInput:
+                default:
+                    onManualVideoStarted.Invoke(videoIndex);
+                    break;
+            }
+        }
+
+        private void InvokeReadyToReveal(CabinPortraitSwitchRequestSource source, int completedIndex)
+        {
+            switch (source)
+            {
+                case CabinPortraitSwitchRequestSource.Auto:
+                    onTimerReadyToReveal.Invoke(completedIndex);
+                    onTimerInitialReadyToReveal.Invoke();
+                    break;
+                case CabinPortraitSwitchRequestSource.ManualInput:
+                default:
+                    onManualReadyToReveal.Invoke(completedIndex);
+                    onManualInitialReadyToReveal.Invoke();
+                    break;
+            }
+        }
+
+        private static string DescribeSwitchRequestSource(CabinPortraitSwitchRequestSource source)
+        {
+            switch (source)
+            {
+                case CabinPortraitSwitchRequestSource.Auto:
+                    return "timer";
+                case CabinPortraitSwitchRequestSource.ManualInput:
+                default:
+                    return "manual";
+            }
         }
 
         private static Texture GetTargetTexture(PlayerSlotState state)
@@ -981,9 +1402,11 @@ namespace CabinPortraits.Video
 
             player.errorReceived -= HandleErrorReceived;
             player.frameReady -= HandleFrameReady;
+            player.loopPointReached -= HandleLoopPointReached;
 
             player.errorReceived += HandleErrorReceived;
             player.frameReady += HandleFrameReady;
+            player.loopPointReached += HandleLoopPointReached;
         }
 
         private void Unsubscribe(VideoPlayer player)
@@ -995,6 +1418,7 @@ namespace CabinPortraits.Video
 
             player.errorReceived -= HandleErrorReceived;
             player.frameReady -= HandleFrameReady;
+            player.loopPointReached -= HandleLoopPointReached;
         }
 
         private void HandleErrorReceived(VideoPlayer player, string message)
@@ -1024,18 +1448,28 @@ namespace CabinPortraits.Video
             }
         }
 
+        private void HandleLoopPointReached(VideoPlayer player)
+        {
+            PlayerSlotState state = GetState(player);
+            if (state == null)
+            {
+                return;
+            }
+
+            state.PlaybackCompleted = true;
+            state.IsPlaying = false;
+        }
+
         private bool HasRequiredReferences()
         {
             if (sequenceConfig != null &&
-                videoPlayerA != null &&
-                videoPlayerB != null &&
                 displayController != null &&
-                sequenceConfig.VideoCount > 0)
+                GetFirstAvailableSlot(CabinPortraitSwitchRequestSource.ManualInput) != null)
             {
                 return true;
             }
 
-            ReportFailure("Missing sequenceConfig, two VideoPlayers, displayController, or video paths.");
+            ReportFailure("Missing sequenceConfig, at least one VideoPlayer, or displayController.");
             return false;
         }
 
@@ -1074,7 +1508,7 @@ namespace CabinPortraits.Video
                 return;
             }
 
-            stateEvents.Invoke(state, this);
+            stateEvents.Invoke(state, activeRequestSource, this);
         }
 
         private void InvokeStateChanged(FlowState previousState, FlowState nextState)
@@ -1108,17 +1542,25 @@ namespace CabinPortraits.Video
             switch (from)
             {
                 case FlowState.SystemInitializing:
-                    return to == FlowState.ActivePreparing;
-                case FlowState.ActivePreparing:
-                    return to == FlowState.ActivePlaying;
-                case FlowState.ActivePlaying:
-                    return to == FlowState.Switching;
-                case FlowState.Switching:
-                    return to == FlowState.CoveredPreparing;
-                case FlowState.CoveredPreparing:
-                    return to == FlowState.ActivePlaying;
+                    return to == FlowState.InitialPreparing;
+                case FlowState.InitialPreparing:
+                    return to == FlowState.Initial;
+                case FlowState.Initial:
+                    return to == FlowState.ManualVideoPreparing || to == FlowState.TimerVideoPreparing;
+                case FlowState.ManualVideoPreparing:
+                    return to == FlowState.ManualVideoPlaying;
+                case FlowState.ManualVideoPlaying:
+                    return to == FlowState.ReturningToInitial;
+                case FlowState.TimerVideoPreparing:
+                    return to == FlowState.TimerVideoPlaying;
+                case FlowState.TimerVideoPlaying:
+                    return to == FlowState.ReturningToInitial;
+                case FlowState.ReturningToInitial:
+                    return to == FlowState.CoveredRestoringInitial;
+                case FlowState.CoveredRestoringInitial:
+                    return to == FlowState.Initial;
                 case FlowState.ErrorRecovery:
-                    return to == FlowState.ActivePreparing;
+                    return to == FlowState.InitialPreparing;
                 default:
                     return false;
             }

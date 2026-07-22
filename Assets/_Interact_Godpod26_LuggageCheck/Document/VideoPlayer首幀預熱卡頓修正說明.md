@@ -104,7 +104,7 @@ Play() 讓 VideoPlayer 真正啟動解碼與輸出
 保留差異如下：
 
 - LuggageCheck 仍由 `VideoPlaybackManager` 對外發出 `FirstFrameReady`，再由 `VideoFlowCoordinator` 推進 `GameFlowManager` 狀態。
-- CabinPortraits 保留原本 coroutine 輪播狀態機，因為它的切換節奏和 `TransitionCoverDelay`、`SwitchInputCooldown`、`AutoSwitchInterval` 綁在同一套流程裡。
+- CabinPortraits 保留 coroutine 流程控制，因為它的 one-shot 播放、回到初始畫面、轉場遮罩與 `TimerVideoDelay` 都綁在同一套流程裡。
 - CabinPortraits 的 prepare timeout 和 first-frame timeout 仍是 warning-only，不會直接進 ErrorRecovery。這是原本輪播內容的容錯設計：如果某支影片首幀比較慢，不希望整個展演流程立刻停在錯誤狀態。
 - LuggageCheck 的 result prepare delay 設計保留，因為它是為了避免 gameplay video 還在播放時同時準備 result video，降低同時解碼造成的尖峰負載。
 
