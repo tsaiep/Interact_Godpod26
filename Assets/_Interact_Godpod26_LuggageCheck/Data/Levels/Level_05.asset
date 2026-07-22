@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RFIDBaggage.Levels.LevelConfig
   levelId: Level_05
   displayName: Test Level 05
-  rfidId: RFID_05
+  rfidId: 5
+  additionalRfidIds: []
   introVideoRelativePath: LuggageCheck/Videos/Level05/Level05_Intro.mp4
   gameplayVideoRelativePath: LuggageCheck/Videos/Level05/Level05_Gameplay.mp4
   successVideoRelativePath: LuggageCheck/Videos/Level05/Level05_Success.mp4

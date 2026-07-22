@@ -43,10 +43,18 @@ namespace RFIDBaggage.Levels
                     continue;
                 }
 
-                string candidateId = useRfid
-                    ? candidate.GetNormalizedRfidId()
-                    : candidate.GetNormalizedLevelId();
+                if (useRfid)
+                {
+                    if (candidate.MatchesNormalizedRfidId(normalizedId))
+                    {
+                        level = candidate;
+                        return true;
+                    }
 
+                    continue;
+                }
+
+                string candidateId = candidate.GetNormalizedLevelId();
                 if (string.Equals(candidateId, normalizedId, System.StringComparison.Ordinal))
                 {
                     level = candidate;
@@ -75,7 +83,13 @@ namespace RFIDBaggage.Levels
                     continue;
                 }
 
-                string id = useRfid ? level.GetNormalizedRfidId() : level.GetNormalizedLevelId();
+                if (useRfid)
+                {
+                    ValidateRfidDuplicates(level, ids);
+                    continue;
+                }
+
+                string id = level.GetNormalizedLevelId();
                 if (string.IsNullOrEmpty(id))
                 {
                     continue;
@@ -83,8 +97,18 @@ namespace RFIDBaggage.Levels
 
                 if (!ids.Add(id))
                 {
-                    string idType = useRfid ? "RFID ID" : "level ID";
-                    Debug.LogWarning($"[LevelDatabase] Duplicate {idType}: {id}", this);
+                    Debug.LogWarning($"[LevelDatabase] Duplicate level ID: {id}", this);
+                }
+            }
+        }
+
+        private void ValidateRfidDuplicates(LevelConfig level, HashSet<string> ids)
+        {
+            foreach (string id in level.GetNormalizedRfidIds())
+            {
+                if (!ids.Add(id))
+                {
+                    Debug.LogWarning($"[LevelDatabase] Duplicate RFID ID: {id}", this);
                 }
             }
         }

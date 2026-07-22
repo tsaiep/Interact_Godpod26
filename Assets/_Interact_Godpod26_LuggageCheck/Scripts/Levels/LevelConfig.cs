@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RFIDBaggage.Levels
@@ -17,6 +18,9 @@ namespace RFIDBaggage.Levels
 
         [SerializeField, Tooltip("RFID identifier that starts this level.")]
         private string rfidId;
+
+        [SerializeField, Tooltip("Additional RFID identifiers that can also start this level.")]
+        private string[] additionalRfidIds = new string[0];
 
         [Header("StreamingAssets Relative Paths")]
         [SerializeField, Tooltip("Intro video path relative to StreamingAssets.")]
@@ -76,6 +80,7 @@ namespace RFIDBaggage.Levels
         public string LevelId => levelId;
         public string DisplayName => displayName;
         public string RfidId => rfidId;
+        public IReadOnlyList<string> AdditionalRfidIds => additionalRfidIds;
         public string IntroVideoRelativePath => introVideoRelativePath;
         public string GameplayVideoRelativePath => gameplayVideoRelativePath;
         public string SuccessVideoRelativePath => successVideoRelativePath;
@@ -102,9 +107,9 @@ namespace RFIDBaggage.Levels
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(rfidId))
+            if (!HasAnyRfidId())
             {
-                message = $"{name} has an empty RFID ID.";
+                message = $"{name} has no RFID IDs.";
                 return false;
             }
 
@@ -176,13 +181,87 @@ namespace RFIDBaggage.Levels
             return NormalizeIdentifier(rfidId);
         }
 
+        public IEnumerable<string> GetNormalizedRfidIds()
+        {
+            string primaryRfidId = GetNormalizedRfidId();
+            if (!string.IsNullOrEmpty(primaryRfidId))
+            {
+                yield return primaryRfidId;
+            }
+
+            if (additionalRfidIds == null)
+            {
+                yield break;
+            }
+
+            for (int i = 0; i < additionalRfidIds.Length; i++)
+            {
+                string additionalRfidId = NormalizeIdentifier(additionalRfidIds[i]);
+                if (!string.IsNullOrEmpty(additionalRfidId))
+                {
+                    yield return additionalRfidId;
+                }
+            }
+        }
+
+        public bool MatchesRfidId(string rfidId)
+        {
+            return MatchesNormalizedRfidId(NormalizeIdentifier(rfidId));
+        }
+
+        public bool MatchesNormalizedRfidId(string normalizedRfidId)
+        {
+            if (string.IsNullOrEmpty(normalizedRfidId))
+            {
+                return false;
+            }
+
+            foreach (string candidateRfidId in GetNormalizedRfidIds())
+            {
+                if (string.Equals(candidateRfidId, normalizedRfidId, System.StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public static string NormalizeIdentifier(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
         }
 
+        private bool HasAnyRfidId()
+        {
+            if (!string.IsNullOrEmpty(GetNormalizedRfidId()))
+            {
+                return true;
+            }
+
+            if (additionalRfidIds == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < additionalRfidIds.Length; i++)
+            {
+                if (!string.IsNullOrEmpty(NormalizeIdentifier(additionalRfidIds[i])))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private void OnValidate()
         {
+            if (additionalRfidIds == null)
+            {
+                additionalRfidIds = new string[0];
+            }
+
             if (gameplayDuration <= 0f)
             {
                 gameplayDuration = 15f;

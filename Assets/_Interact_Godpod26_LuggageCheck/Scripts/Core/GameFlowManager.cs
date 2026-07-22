@@ -135,7 +135,7 @@ namespace RFIDBaggage.Core
 
         [Header("Input")]
         [SerializeField, Tooltip("Key used to confirm gameplay selections. Enter accepts both Return and Keypad Enter.")]
-        private GameFlowConfirmKey confirmKey = GameFlowConfirmKey.Space;
+        private GameFlowConfirmKey confirmKey = GameFlowConfirmKey.Enter;
 
         [Header("Gameplay Start Gate")]
         [SerializeField, Tooltip("When enabled, the flow waits after gameplay content is prepared until the confirm key is held.")]

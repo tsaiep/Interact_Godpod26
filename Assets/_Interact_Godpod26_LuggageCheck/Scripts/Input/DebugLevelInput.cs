@@ -1,5 +1,4 @@
 using RFIDBaggage.Core;
-using RFIDBaggage.Levels;
 using UnityEngine;
 
 namespace RFIDBaggage.Input
@@ -9,25 +8,32 @@ namespace RFIDBaggage.Input
         [SerializeField, Tooltip("Main flow manager that owns state transitions.")]
         private GameFlowManager gameFlowManager;
 
-        [SerializeField, Tooltip("Level database used to look up test RFID IDs.")]
-        private LevelDatabase levelDatabase;
+        [Header("RFID / Manual Level Start Input")]
+        [SerializeField, Tooltip("Enable keyboard-wedge RFID input. Manual typing uses the same flow and must end with Enter.")]
+        private bool enableRfidInput = true;
 
-        [SerializeField, Tooltip("RFID IDs triggered by number keys 1 through 6.")]
-        private string[] numberKeyRfidIds =
-        {
-            "RFID_01",
-            "RFID_02",
-            "RFID_03",
-            "RFID_04",
-            "RFID_05",
-            "RFID_06"
-        };
+        [SerializeField, Min(1), Tooltip("Maximum characters accepted before Enter submits the RFID ID.")]
+        private int maxRfidInputLength = 64;
+
+        [SerializeField, Min(0f), Tooltip("Seconds before partially typed RFID input is cleared. Set 0 to keep the buffer until Enter.")]
+        private float rfidInputTimeoutSeconds = 5f;
 
         [SerializeField, Tooltip("Enable first-stage manual phase keys I/P/O/G/R/E. Keep disabled for phase 2 video flow tests.")]
         private bool enableManualPhaseKeys;
 
         [SerializeField, Tooltip("Enable direct S/F result keys. Keep disabled for phase 3 gameplay tests.")]
         private bool enableDirectResultKeys;
+
+        [SerializeField, Tooltip("Runtime display only. Current RFID characters waiting for Enter.")]
+        private string pendingRfidInput = string.Empty;
+
+        private float lastRfidInputTime;
+
+        private void OnValidate()
+        {
+            maxRfidInputLength = Mathf.Max(1, maxRfidInputLength);
+            rfidInputTimeoutSeconds = Mathf.Max(0f, rfidInputTimeoutSeconds);
+        }
 
         private void Update()
         {
@@ -36,7 +42,10 @@ namespace RFIDBaggage.Input
                 return;
             }
 
-            HandleLevelKeys();
+            if (enableRfidInput)
+            {
+                HandleRfidInput();
+            }
 
             if (enableDirectResultKeys)
             {
@@ -51,31 +60,118 @@ namespace RFIDBaggage.Input
             HandleEscapeKey();
         }
 
-        private void HandleLevelKeys()
+        private void HandleRfidInput()
         {
-            for (int i = 0; i < numberKeyRfidIds.Length && i < 6; i++)
+            ClearStaleRfidInput();
+
+            string input = UnityEngine.Input.inputString;
+            if (string.IsNullOrEmpty(input))
             {
-                KeyCode keyCode = (KeyCode)((int)KeyCode.Alpha1 + i);
-                if (!UnityEngine.Input.GetKeyDown(keyCode))
+                if (IsSubmitKeyDown())
+                {
+                    SubmitPendingRfidInput();
+                }
+
+                return;
+            }
+
+            bool submittedFromInputString = false;
+            for (int i = 0; i < input.Length; i++)
+            {
+                char character = input[i];
+                if (character == '\b')
+                {
+                    RemoveLastRfidInputCharacter();
+                    continue;
+                }
+
+                if (character == '\n' || character == '\r')
+                {
+                    SubmitPendingRfidInput();
+                    submittedFromInputString = true;
+                    continue;
+                }
+
+                if (char.IsControl(character))
                 {
                     continue;
                 }
 
-                if (levelDatabase == null)
-                {
-                    Debug.LogWarning("[DebugLevelInput] LevelDatabase is not assigned.", this);
-                    return;
-                }
-
-                string rfidId = numberKeyRfidIds[i];
-                if (!levelDatabase.TryGetByRfidId(rfidId, out LevelConfig level))
-                {
-                    Debug.LogWarning($"[DebugLevelInput] No test level found for RFID: {rfidId}", this);
-                    return;
-                }
-
-                gameFlowManager.RequestStartLevel(level);
+                AppendRfidInputCharacter(character);
             }
+
+            if (!submittedFromInputString && IsSubmitKeyDown())
+            {
+                SubmitPendingRfidInput();
+            }
+        }
+
+        private static bool IsSubmitKeyDown()
+        {
+            return UnityEngine.Input.GetKeyDown(KeyCode.Return) ||
+                UnityEngine.Input.GetKeyDown(KeyCode.KeypadEnter);
+        }
+
+        private void AppendRfidInputCharacter(char character)
+        {
+            if (pendingRfidInput.Length >= maxRfidInputLength)
+            {
+                Debug.LogWarning($"[DebugLevelInput] RFID input exceeded {maxRfidInputLength} characters and was cleared.", this);
+                ClearPendingRfidInput();
+                return;
+            }
+
+            pendingRfidInput += character;
+            lastRfidInputTime = Time.unscaledTime;
+        }
+
+        private void RemoveLastRfidInputCharacter()
+        {
+            if (pendingRfidInput.Length <= 0)
+            {
+                return;
+            }
+
+            pendingRfidInput = pendingRfidInput.Substring(0, pendingRfidInput.Length - 1);
+            lastRfidInputTime = Time.unscaledTime;
+        }
+
+        private void SubmitPendingRfidInput()
+        {
+            string rfidId = pendingRfidInput.Trim();
+            ClearPendingRfidInput();
+
+            if (string.IsNullOrEmpty(rfidId))
+            {
+                return;
+            }
+
+            if (gameFlowManager.CurrentState != GameState.Idle)
+            {
+                Debug.LogWarning($"[DebugLevelInput] Ignored RFID input while state is {gameFlowManager.CurrentState}: {rfidId}", this);
+                return;
+            }
+
+            gameFlowManager.RequestStartLevelByRfid(rfidId);
+        }
+
+        private void ClearStaleRfidInput()
+        {
+            if (rfidInputTimeoutSeconds <= 0f || string.IsNullOrEmpty(pendingRfidInput))
+            {
+                return;
+            }
+
+            if (Time.unscaledTime - lastRfidInputTime >= rfidInputTimeoutSeconds)
+            {
+                ClearPendingRfidInput();
+            }
+        }
+
+        private void ClearPendingRfidInput()
+        {
+            pendingRfidInput = string.Empty;
+            lastRfidInputTime = 0f;
         }
 
         private void HandleResultKeys()
