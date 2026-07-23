@@ -19228,6 +19228,10 @@ MonoBehaviour:
   confirmKey: 1
   requireGameplayStartConfirmKeyDownCount: 1
   gameplayStartConfirmRequiredKeyDownCount: 2
+  gameplayStartConfirmInputDelaySeconds: 5.5
+  onGameplayStartConfirmInputEnabled:
+    m_PersistentCalls:
+      m_Calls: []
   onGameplayStartConfirmKeyDown:
     m_PersistentCalls:
       m_Calls:

@@ -150,6 +150,12 @@ namespace RFIDBaggage.Core
         [SerializeField, Min(0), Tooltip("Number of confirm key-down events required before Gameplay starts. Set to 0 to start immediately after entering the pending state.")]
         private int gameplayStartConfirmRequiredKeyDownCount = 3;
 
+        [SerializeField, Min(0f), Tooltip("Seconds to wait after entering GameplayStartPending before confirm key-down input is accepted.")]
+        private float gameplayStartConfirmInputDelaySeconds;
+
+        [SerializeField, Tooltip("Invoked once when gameplay start confirm input becomes enabled in GameplayStartPending.")]
+        private UnityEvent onGameplayStartConfirmInputEnabled = new UnityEvent();
+
         [SerializeField, Tooltip("Invoked every time the confirm key is pressed down in GameplayStartPending.")]
         private UnityEvent onGameplayStartConfirmKeyDown = new UnityEvent();
 
@@ -173,6 +179,8 @@ namespace RFIDBaggage.Core
         private LevelConfig currentLevel;
         private bool resultLocked;
         private bool logResetCompleteWhenIdle;
+        private float gameplayStartConfirmInputDelayElapsedSeconds;
+        private bool gameplayStartConfirmInputEnabled;
         private int gameplayStartConfirmKeyDownCount;
         private bool gameplayStartConfirmKeyDownCountCompleted;
 
@@ -182,6 +190,12 @@ namespace RFIDBaggage.Core
         public GameFlowConfirmKey ConfirmKey => confirmKey;
         public bool RequireGameplayStartConfirmKeyDownCount => requireGameplayStartConfirmKeyDownCount;
         public int GameplayStartConfirmRequiredKeyDownCount => Mathf.Max(0, gameplayStartConfirmRequiredKeyDownCount);
+        public float GameplayStartConfirmInputDelaySeconds => Mathf.Max(0f, gameplayStartConfirmInputDelaySeconds);
+        public float GameplayStartConfirmInputDelayElapsedSeconds => gameplayStartConfirmInputDelayElapsedSeconds;
+        public bool IsGameplayStartConfirmInputEnabled => gameplayStartConfirmInputEnabled;
+        public float GameplayStartConfirmInputDelayProgress => GameplayStartConfirmInputDelaySeconds > 0f
+            ? Mathf.Clamp01(gameplayStartConfirmInputDelayElapsedSeconds / GameplayStartConfirmInputDelaySeconds)
+            : 1f;
         public int GameplayStartConfirmKeyDownCount => gameplayStartConfirmKeyDownCount;
         public float GameplayStartConfirmKeyDownProgress => GameplayStartConfirmRequiredKeyDownCount > 0
             ? Mathf.Clamp01((float)gameplayStartConfirmKeyDownCount / GameplayStartConfirmRequiredKeyDownCount)
@@ -202,6 +216,7 @@ namespace RFIDBaggage.Core
         public event Action<GameState, GameState> StateChanged;
         public event Action<LevelConfig> LevelStarted;
         public event Action<LevelConfig> GameplayStarted;
+        public event Action GameplayStartConfirmInputEnabled;
         public event Action GameplayStartConfirmKeyDown;
         public event Action<int, int> GameplayStartConfirmKeyDownCountChanged;
         public event Action GameplayStartConfirmKeyDownCountCompleted;
@@ -275,6 +290,7 @@ namespace RFIDBaggage.Core
         {
             visibleStateSequence = (GameState[])StateSequence.Clone();
             gameplayStartConfirmRequiredKeyDownCount = Mathf.Max(0, gameplayStartConfirmRequiredKeyDownCount);
+            gameplayStartConfirmInputDelaySeconds = Mathf.Max(0f, gameplayStartConfirmInputDelaySeconds);
         }
 
         private void Start()
@@ -376,7 +392,9 @@ namespace RFIDBaggage.Core
 
             if (requireGameplayStartConfirmKeyDownCount)
             {
-                if (TransitionTo(GameState.GameplayStartPending) && GameplayStartConfirmRequiredKeyDownCount <= 0)
+                if (TransitionTo(GameState.GameplayStartPending)
+                    && IsGameplayStartConfirmInputEnabled
+                    && GameplayStartConfirmRequiredKeyDownCount <= 0)
                 {
                     CompleteGameplayStartConfirmKeyDownCount();
                 }
@@ -486,6 +504,15 @@ namespace RFIDBaggage.Core
                 return;
             }
 
+            if (!IsGameplayStartConfirmInputEnabled)
+            {
+                UpdateGameplayStartConfirmInputDelay();
+                if (!IsGameplayStartConfirmInputEnabled)
+                {
+                    return;
+                }
+            }
+
             int requiredCount = GameplayStartConfirmRequiredKeyDownCount;
             if (requiredCount <= 0)
             {
@@ -506,6 +533,42 @@ namespace RFIDBaggage.Core
             {
                 CompleteGameplayStartConfirmKeyDownCount();
             }
+        }
+
+        private void UpdateGameplayStartConfirmInputDelay()
+        {
+            if (gameplayStartConfirmInputEnabled)
+            {
+                return;
+            }
+
+            float delaySeconds = GameplayStartConfirmInputDelaySeconds;
+            if (delaySeconds <= 0f)
+            {
+                EnableGameplayStartConfirmInput();
+                return;
+            }
+
+            gameplayStartConfirmInputDelayElapsedSeconds = Mathf.Min(
+                gameplayStartConfirmInputDelayElapsedSeconds + Time.unscaledDeltaTime,
+                delaySeconds);
+
+            if (gameplayStartConfirmInputDelayElapsedSeconds >= delaySeconds)
+            {
+                EnableGameplayStartConfirmInput();
+            }
+        }
+
+        private void EnableGameplayStartConfirmInput()
+        {
+            if (gameplayStartConfirmInputEnabled)
+            {
+                return;
+            }
+
+            gameplayStartConfirmInputEnabled = true;
+            gameplayStartConfirmInputDelayElapsedSeconds = GameplayStartConfirmInputDelaySeconds;
+            InvokeGameplayStartConfirmInputEnabled();
         }
 
         private void CompleteGameplayStartConfirmKeyDownCount()
@@ -533,6 +596,12 @@ namespace RFIDBaggage.Core
         private void ResetGameplayStartConfirmKeyDownCount()
         {
             gameplayStartConfirmKeyDownCount = 0;
+        }
+
+        private void ResetGameplayStartConfirmInputDelay()
+        {
+            gameplayStartConfirmInputDelayElapsedSeconds = 0f;
+            gameplayStartConfirmInputEnabled = false;
         }
 
         private void ResetAndReturnToIdle()
@@ -592,12 +661,20 @@ namespace RFIDBaggage.Core
             }
             else if (previousState == GameState.GameplayStartPending)
             {
+                ResetGameplayStartConfirmInputDelay();
                 ResetGameplayStartConfirmKeyDownCount();
             }
 
             Debug.Log($"[GameFlow] {previousState} -> {nextState}", this);
             InvokeStateChanged(previousState, nextState);
             stateEvents.Invoke(nextState);
+
+            if (nextState == GameState.GameplayStartPending
+                && currentState == GameState.GameplayStartPending
+                && GameplayStartConfirmInputDelaySeconds <= 0f)
+            {
+                EnableGameplayStartConfirmInput();
+            }
 
             if (nextState == GameState.Idle && previousState == GameState.IdlePreparing && logResetCompleteWhenIdle)
             {
@@ -632,6 +709,7 @@ namespace RFIDBaggage.Core
         private void ResetGameplayStartConfirmKeyDownCountState()
         {
             gameplayStartConfirmKeyDownCountCompleted = false;
+            ResetGameplayStartConfirmInputDelay();
             ResetGameplayStartConfirmKeyDownCount();
         }
 
@@ -674,6 +752,34 @@ namespace RFIDBaggage.Core
                 {
                     Debug.LogException(new Exception("[GameFlow] GameplayStarted handler failed.", exception), this);
                 }
+            }
+        }
+
+        private void InvokeGameplayStartConfirmInputEnabled()
+        {
+            Action handlers = GameplayStartConfirmInputEnabled;
+            if (handlers != null)
+            {
+                foreach (Action handler in handlers.GetInvocationList())
+                {
+                    try
+                    {
+                        handler.Invoke();
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmInputEnabled handler failed.", exception), this);
+                    }
+                }
+            }
+
+            try
+            {
+                onGameplayStartConfirmInputEnabled.Invoke();
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmInputEnabled", exception), this);
             }
         }
 
