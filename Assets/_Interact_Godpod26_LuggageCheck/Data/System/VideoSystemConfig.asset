@@ -16,5 +16,5 @@ MonoBehaviour:
   prepareTimeout: 10
   firstFrameTimeout: 5
   imageLoadTimeout: 10
-  idleLoopSignalToIntroDelay: 2
+  idleLoopSignalToIntroDelay: 1
   verboseVideoLogs: 0

@@ -30906,7 +30906,7 @@ MonoBehaviour:
         NewScale: {x: 0, y: 0}
         NewVector: {x: 0, y: 0, z: 0, w: 0}
         InterpolateValue: 1
-        Duration: 2
+        Duration: 1
         InterpolationCurve:
           MMTweenDefinitionType: 1
           MMTweenCurve: 4
