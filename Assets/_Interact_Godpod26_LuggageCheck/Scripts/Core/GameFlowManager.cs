@@ -3,11 +3,17 @@ using System.Collections.Generic;
 using RFIDBaggage.Levels;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Serialization;
 
 namespace RFIDBaggage.Core
 {
     [Serializable]
     public sealed class GameStateUnityEvent : UnityEvent<GameState>
+    {
+    }
+
+    [Serializable]
+    public sealed class GameplayStartConfirmKeyDownCountUnityEvent : UnityEvent<int, int>
     {
     }
 
@@ -138,20 +144,20 @@ namespace RFIDBaggage.Core
         private GameFlowConfirmKey confirmKey = GameFlowConfirmKey.Enter;
 
         [Header("Gameplay Start Gate")]
-        [SerializeField, Tooltip("When enabled, the flow waits after gameplay content is prepared until the confirm key is held.")]
-        private bool requireGameplayStartConfirmHold = true;
+        [SerializeField, FormerlySerializedAs("requireGameplayStartConfirmHold"), Tooltip("When enabled, the flow waits after gameplay content is prepared until the confirm key is pressed the required number of times.")]
+        private bool requireGameplayStartConfirmKeyDownCount = true;
 
-        [SerializeField, Min(0f), Tooltip("Seconds the confirm key must be held before Gameplay starts.")]
-        private float gameplayStartConfirmHoldSeconds = 2f;
+        [SerializeField, Min(0), Tooltip("Number of confirm key-down events required before Gameplay starts. Set to 0 to start immediately after entering the pending state.")]
+        private int gameplayStartConfirmRequiredKeyDownCount = 3;
 
-        [SerializeField, Tooltip("Invoked once when the confirm key is pressed down in GameplayStartPending.")]
+        [SerializeField, Tooltip("Invoked every time the confirm key is pressed down in GameplayStartPending.")]
         private UnityEvent onGameplayStartConfirmKeyDown = new UnityEvent();
 
-        [SerializeField, Tooltip("Invoked once when the confirm key is released in GameplayStartPending.")]
-        private UnityEvent onGameplayStartConfirmKeyUp = new UnityEvent();
+        [SerializeField, Tooltip("Invoked every time the confirm key-down count changes. Arguments are current count and required count.")]
+        private GameplayStartConfirmKeyDownCountUnityEvent onGameplayStartConfirmKeyDownCountChanged = new GameplayStartConfirmKeyDownCountUnityEvent();
 
-        [SerializeField, Tooltip("Invoked once when the confirm key has been held long enough to enter Gameplay.")]
-        private UnityEvent onGameplayStartConfirmHoldCompleted = new UnityEvent();
+        [SerializeField, FormerlySerializedAs("onGameplayStartConfirmHoldCompleted"), Tooltip("Invoked once when the confirm key has been pressed down enough times to enter Gameplay.")]
+        private UnityEvent onGameplayStartConfirmKeyDownCountCompleted = new UnityEvent();
 
         [Header("Runtime Debug")]
         [SerializeField, Tooltip("All flow states for Inspector display only. This list is not used to drive state transitions.")]
@@ -167,26 +173,50 @@ namespace RFIDBaggage.Core
         private LevelConfig currentLevel;
         private bool resultLocked;
         private bool logResetCompleteWhenIdle;
-        private float gameplayStartConfirmHeldSeconds;
-        private bool gameplayStartConfirmHoldCompleted;
+        private int gameplayStartConfirmKeyDownCount;
+        private bool gameplayStartConfirmKeyDownCountCompleted;
 
         public IReadOnlyList<GameState> AllStates => ReadOnlyStateSequence;
         public GameState CurrentState => currentState;
         public LevelConfig CurrentLevel => currentLevel;
         public GameFlowConfirmKey ConfirmKey => confirmKey;
-        public bool RequireGameplayStartConfirmHold => requireGameplayStartConfirmHold;
-        public float GameplayStartConfirmHoldSeconds => gameplayStartConfirmHoldSeconds;
-        public float GameplayStartConfirmHeldSeconds => gameplayStartConfirmHeldSeconds;
-        public float GameplayStartConfirmHoldProgress => gameplayStartConfirmHoldSeconds > 0f
-            ? Mathf.Clamp01(gameplayStartConfirmHeldSeconds / gameplayStartConfirmHoldSeconds)
+        public bool RequireGameplayStartConfirmKeyDownCount => requireGameplayStartConfirmKeyDownCount;
+        public int GameplayStartConfirmRequiredKeyDownCount => Mathf.Max(0, gameplayStartConfirmRequiredKeyDownCount);
+        public int GameplayStartConfirmKeyDownCount => gameplayStartConfirmKeyDownCount;
+        public float GameplayStartConfirmKeyDownProgress => GameplayStartConfirmRequiredKeyDownCount > 0
+            ? Mathf.Clamp01((float)gameplayStartConfirmKeyDownCount / GameplayStartConfirmRequiredKeyDownCount)
             : 1f;
+
+        [Obsolete("Use RequireGameplayStartConfirmKeyDownCount.")]
+        public bool RequireGameplayStartConfirmHold => RequireGameplayStartConfirmKeyDownCount;
+
+        [Obsolete("Use GameplayStartConfirmRequiredKeyDownCount.")]
+        public float GameplayStartConfirmHoldSeconds => GameplayStartConfirmRequiredKeyDownCount;
+
+        [Obsolete("Use GameplayStartConfirmKeyDownCount.")]
+        public float GameplayStartConfirmHeldSeconds => GameplayStartConfirmKeyDownCount;
+
+        [Obsolete("Use GameplayStartConfirmKeyDownProgress.")]
+        public float GameplayStartConfirmHoldProgress => GameplayStartConfirmKeyDownProgress;
 
         public event Action<GameState, GameState> StateChanged;
         public event Action<LevelConfig> LevelStarted;
         public event Action<LevelConfig> GameplayStarted;
         public event Action GameplayStartConfirmKeyDown;
-        public event Action GameplayStartConfirmKeyUp;
-        public event Action GameplayStartConfirmHoldCompleted;
+        public event Action<int, int> GameplayStartConfirmKeyDownCountChanged;
+        public event Action GameplayStartConfirmKeyDownCountCompleted;
+        [Obsolete("Gameplay start confirm no longer tracks key release.")]
+        public event Action GameplayStartConfirmKeyUp
+        {
+            add { }
+            remove { }
+        }
+        [Obsolete("Use GameplayStartConfirmKeyDownCountCompleted.")]
+        public event Action GameplayStartConfirmHoldCompleted
+        {
+            add => GameplayStartConfirmKeyDownCountCompleted += value;
+            remove => GameplayStartConfirmKeyDownCountCompleted -= value;
+        }
         public event Action<LevelConfig, bool> LevelFinished;
         public event Action LevelReset;
 
@@ -244,7 +274,7 @@ namespace RFIDBaggage.Core
         private void OnValidate()
         {
             visibleStateSequence = (GameState[])StateSequence.Clone();
-            gameplayStartConfirmHoldSeconds = Mathf.Max(0f, gameplayStartConfirmHoldSeconds);
+            gameplayStartConfirmRequiredKeyDownCount = Mathf.Max(0, gameplayStartConfirmRequiredKeyDownCount);
         }
 
         private void Start()
@@ -261,7 +291,7 @@ namespace RFIDBaggage.Core
         {
             if (currentState == GameState.GameplayStartPending)
             {
-                UpdateGameplayStartConfirmHold();
+                UpdateGameplayStartConfirmKeyDownCount();
             }
         }
 
@@ -344,11 +374,11 @@ namespace RFIDBaggage.Core
                 return;
             }
 
-            if (requireGameplayStartConfirmHold)
+            if (requireGameplayStartConfirmKeyDownCount)
             {
-                if (TransitionTo(GameState.GameplayStartPending) && gameplayStartConfirmHoldSeconds <= 0f)
+                if (TransitionTo(GameState.GameplayStartPending) && GameplayStartConfirmRequiredKeyDownCount <= 0)
                 {
-                    CompleteGameplayStartConfirmHold();
+                    CompleteGameplayStartConfirmKeyDownCount();
                 }
 
                 return;
@@ -449,51 +479,45 @@ namespace RFIDBaggage.Core
             return TransitionTo(nextState);
         }
 
-        private void UpdateGameplayStartConfirmHold()
+        private void UpdateGameplayStartConfirmKeyDownCount()
         {
-            if (gameplayStartConfirmHoldCompleted)
+            if (gameplayStartConfirmKeyDownCountCompleted)
             {
                 return;
             }
 
-            if (IsConfirmKeyDown())
+            int requiredCount = GameplayStartConfirmRequiredKeyDownCount;
+            if (requiredCount <= 0)
             {
-                InvokeGameplayStartConfirmKeyDown();
-            }
-
-            if (IsConfirmKeyUp())
-            {
-                InvokeGameplayStartConfirmKeyUp();
-                ResetGameplayStartConfirmHold();
+                CompleteGameplayStartConfirmKeyDownCount();
                 return;
             }
 
-            if (!IsConfirmKeyPressed())
+            if (!IsConfirmKeyDown())
             {
-                ResetGameplayStartConfirmHold();
                 return;
             }
 
-            gameplayStartConfirmHeldSeconds = Mathf.Min(
-                gameplayStartConfirmHeldSeconds + Time.unscaledDeltaTime,
-                gameplayStartConfirmHoldSeconds);
+            gameplayStartConfirmKeyDownCount = Mathf.Min(gameplayStartConfirmKeyDownCount + 1, requiredCount);
 
-            if (gameplayStartConfirmHeldSeconds >= gameplayStartConfirmHoldSeconds)
+            InvokeGameplayStartConfirmKeyDown(gameplayStartConfirmKeyDownCount, requiredCount);
+
+            if (gameplayStartConfirmKeyDownCount >= requiredCount)
             {
-                CompleteGameplayStartConfirmHold();
+                CompleteGameplayStartConfirmKeyDownCount();
             }
         }
 
-        private void CompleteGameplayStartConfirmHold()
+        private void CompleteGameplayStartConfirmKeyDownCount()
         {
-            if (currentState != GameState.GameplayStartPending || gameplayStartConfirmHoldCompleted)
+            if (currentState != GameState.GameplayStartPending || gameplayStartConfirmKeyDownCountCompleted)
             {
                 return;
             }
 
-            gameplayStartConfirmHoldCompleted = true;
-            gameplayStartConfirmHeldSeconds = gameplayStartConfirmHoldSeconds;
-            InvokeGameplayStartConfirmHoldCompleted();
+            gameplayStartConfirmKeyDownCountCompleted = true;
+            gameplayStartConfirmKeyDownCount = GameplayStartConfirmRequiredKeyDownCount;
+            InvokeGameplayStartConfirmKeyDownCountCompleted();
 
             if (currentState != GameState.GameplayStartPending)
             {
@@ -506,9 +530,9 @@ namespace RFIDBaggage.Core
             }
         }
 
-        private void ResetGameplayStartConfirmHold()
+        private void ResetGameplayStartConfirmKeyDownCount()
         {
-            gameplayStartConfirmHeldSeconds = 0f;
+            gameplayStartConfirmKeyDownCount = 0;
         }
 
         private void ResetAndReturnToIdle()
@@ -564,11 +588,11 @@ namespace RFIDBaggage.Core
             currentState = nextState;
             if (nextState == GameState.GameplayStartPending)
             {
-                ResetGameplayStartConfirmHoldState();
+                ResetGameplayStartConfirmKeyDownCountState();
             }
             else if (previousState == GameState.GameplayStartPending)
             {
-                ResetGameplayStartConfirmHold();
+                ResetGameplayStartConfirmKeyDownCount();
             }
 
             Debug.Log($"[GameFlow] {previousState} -> {nextState}", this);
@@ -605,10 +629,10 @@ namespace RFIDBaggage.Core
             }
         }
 
-        private void ResetGameplayStartConfirmHoldState()
+        private void ResetGameplayStartConfirmKeyDownCountState()
         {
-            gameplayStartConfirmHoldCompleted = false;
-            ResetGameplayStartConfirmHold();
+            gameplayStartConfirmKeyDownCountCompleted = false;
+            ResetGameplayStartConfirmKeyDownCount();
         }
 
         private void InvokeLevelStarted(LevelConfig level)
@@ -653,12 +677,12 @@ namespace RFIDBaggage.Core
             }
         }
 
-        private void InvokeGameplayStartConfirmKeyDown()
+        private void InvokeGameplayStartConfirmKeyDown(int currentCount, int requiredCount)
         {
-            Action handlers = GameplayStartConfirmKeyDown;
-            if (handlers != null)
+            Action keyDownHandlers = GameplayStartConfirmKeyDown;
+            if (keyDownHandlers != null)
             {
-                foreach (Action handler in handlers.GetInvocationList())
+                foreach (Action handler in keyDownHandlers.GetInvocationList())
                 {
                     try
                     {
@@ -679,11 +703,36 @@ namespace RFIDBaggage.Core
             {
                 Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmKeyDown", exception), this);
             }
+
+            try
+            {
+                onGameplayStartConfirmKeyDownCountChanged.Invoke(currentCount, requiredCount);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmKeyDownCountChanged", exception), this);
+            }
+
+            Action<int, int> countChangedHandlers = GameplayStartConfirmKeyDownCountChanged;
+            if (countChangedHandlers != null)
+            {
+                foreach (Action<int, int> handler in countChangedHandlers.GetInvocationList())
+                {
+                    try
+                    {
+                        handler.Invoke(currentCount, requiredCount);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmKeyDownCountChanged handler failed.", exception), this);
+                    }
+                }
+            }
         }
 
-        private void InvokeGameplayStartConfirmKeyUp()
+        private void InvokeGameplayStartConfirmKeyDownCountCompleted()
         {
-            Action handlers = GameplayStartConfirmKeyUp;
+            Action handlers = GameplayStartConfirmKeyDownCountCompleted;
             if (handlers != null)
             {
                 foreach (Action handler in handlers.GetInvocationList())
@@ -694,46 +743,18 @@ namespace RFIDBaggage.Core
                     }
                     catch (Exception exception)
                     {
-                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmKeyUp handler failed.", exception), this);
+                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmKeyDownCountCompleted handler failed.", exception), this);
                     }
                 }
             }
 
             try
             {
-                onGameplayStartConfirmKeyUp.Invoke();
+                onGameplayStartConfirmKeyDownCountCompleted.Invoke();
             }
             catch (Exception exception)
             {
-                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmKeyUp", exception), this);
-            }
-        }
-
-        private void InvokeGameplayStartConfirmHoldCompleted()
-        {
-            Action handlers = GameplayStartConfirmHoldCompleted;
-            if (handlers != null)
-            {
-                foreach (Action handler in handlers.GetInvocationList())
-                {
-                    try
-                    {
-                        handler.Invoke();
-                    }
-                    catch (Exception exception)
-                    {
-                        Debug.LogException(new Exception("[GameFlow] GameplayStartConfirmHoldCompleted handler failed.", exception), this);
-                    }
-                }
-            }
-
-            try
-            {
-                onGameplayStartConfirmHoldCompleted.Invoke();
-            }
-            catch (Exception exception)
-            {
-                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmHoldCompleted", exception), this);
+                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmKeyDownCountCompleted", exception), this);
             }
         }
 
