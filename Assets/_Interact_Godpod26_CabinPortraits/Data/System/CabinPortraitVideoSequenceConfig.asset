@@ -20,7 +20,7 @@ MonoBehaviour:
   - CabinPortraits/Videos/Video_05.mp4
   - CabinPortraits/Videos/Video_06.mp4
   timerVideoRelativePaths:
-  - CabinPortraits/Videos/Video_06.mp4
+  - CabinPortraits/Videos/TimerVideo_01.mp4
   startIndex: 0
   timerStartIndex: 0
   playOnStart: 1
