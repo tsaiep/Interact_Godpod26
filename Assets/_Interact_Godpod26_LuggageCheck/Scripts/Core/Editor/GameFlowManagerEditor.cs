@@ -8,6 +8,8 @@ namespace RFIDBaggage.EditorTools
     {
         private const string VisibleStateSequenceProperty = "visibleStateSequence";
         private const string CurrentStateProperty = "currentState";
+        private const string GameplayElapsedSecondsProperty = "gameplayElapsedSeconds";
+        private const string LastGameplayDurationSecondsProperty = "lastGameplayDurationSeconds";
 
         public override void OnInspectorGUI()
         {
@@ -23,7 +25,9 @@ namespace RFIDBaggage.EditorTools
                 bool isScriptReference = property.propertyPath == "m_Script";
                 bool isRuntimeDebugField =
                     property.propertyPath == VisibleStateSequenceProperty ||
-                    property.propertyPath == CurrentStateProperty;
+                    property.propertyPath == CurrentStateProperty ||
+                    property.propertyPath == GameplayElapsedSecondsProperty ||
+                    property.propertyPath == LastGameplayDurationSecondsProperty;
 
                 using (new EditorGUI.DisabledScope(isScriptReference || isRuntimeDebugField))
                 {

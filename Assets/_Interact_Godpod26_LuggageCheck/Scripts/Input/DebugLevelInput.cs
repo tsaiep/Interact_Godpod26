@@ -62,6 +62,12 @@ namespace RFIDBaggage.Input
 
         private void HandleRfidInput()
         {
+            if (gameFlowManager.IsIdleLevelInputBlocked)
+            {
+                ClearPendingRfidInput();
+                return;
+            }
+
             ClearStaleRfidInput();
 
             string input = UnityEngine.Input.inputString;

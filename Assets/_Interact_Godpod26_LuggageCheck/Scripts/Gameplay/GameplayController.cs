@@ -302,6 +302,7 @@ namespace RFIDBaggage.Gameplay
                 selectionController.EnableInput();
             }
 
+            gameFlowManager.NotifyGameplayOperableStarted();
             onGameplayStarted.Invoke();
         }
 

@@ -23,6 +23,9 @@ namespace RFIDBaggage.Video
         [SerializeField, Min(0f), Tooltip("Seconds to keep the idle loop visible after a start signal before preparing the intro video.")]
         private float idleLoopSignalToIntroDelay;
 
+        [SerializeField, Min(0f), Tooltip("Seconds after entering Idle before level ID input is accepted. Set 0 to accept input immediately.")]
+        private float idleLevelInputBlockSeconds;
+
         [SerializeField, Tooltip("When enabled, video modules output detailed Console logs.")]
         private bool verboseVideoLogs = true;
 
@@ -31,6 +34,7 @@ namespace RFIDBaggage.Video
         public float FirstFrameTimeout => firstFrameTimeout;
         public float ImageLoadTimeout => imageLoadTimeout;
         public float IdleLoopSignalToIntroDelay => idleLoopSignalToIntroDelay;
+        public float IdleLevelInputBlockSeconds => idleLevelInputBlockSeconds;
         public bool VerboseVideoLogs => verboseVideoLogs;
 
         private void OnValidate()
@@ -39,6 +43,7 @@ namespace RFIDBaggage.Video
             firstFrameTimeout = Mathf.Max(0.1f, firstFrameTimeout);
             imageLoadTimeout = Mathf.Max(0.1f, imageLoadTimeout);
             idleLoopSignalToIntroDelay = Mathf.Max(0f, idleLoopSignalToIntroDelay);
+            idleLevelInputBlockSeconds = Mathf.Max(0f, idleLevelInputBlockSeconds);
         }
     }
 }

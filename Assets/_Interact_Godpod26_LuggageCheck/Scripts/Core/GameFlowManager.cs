@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using RFIDBaggage.Levels;
+using RFIDBaggage.Video;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.Serialization;
@@ -14,6 +15,11 @@ namespace RFIDBaggage.Core
 
     [Serializable]
     public sealed class GameplayStartConfirmKeyDownCountUnityEvent : UnityEvent<int, int>
+    {
+    }
+
+    [Serializable]
+    public sealed class GameplayDurationThresholdUnityEvent : UnityEvent<float, float>
     {
     }
 
@@ -136,6 +142,9 @@ namespace RFIDBaggage.Core
         [SerializeField, Tooltip("Database used to map RFID IDs to level configs.")]
         private LevelDatabase levelDatabase;
 
+        [SerializeField, Tooltip("Global video system settings, including the Idle level input lockout duration.")]
+        private VideoSystemConfig videoSystemConfig;
+
         [SerializeField, Tooltip("When enabled, the flow automatically enters Idle on Start.")]
         private bool enterIdleOnStart = true;
 
@@ -165,12 +174,28 @@ namespace RFIDBaggage.Core
         [SerializeField, FormerlySerializedAs("onGameplayStartConfirmHoldCompleted"), Tooltip("Invoked once when the confirm key has been pressed down enough times to enter Gameplay.")]
         private UnityEvent onGameplayStartConfirmKeyDownCountCompleted = new UnityEvent();
 
+        [Header("Gameplay Duration Threshold")]
+        [SerializeField, Min(0f), Tooltip("Seconds allowed for the gameplay phase. Set 0 to treat every completed gameplay as passing the duration threshold.")]
+        private float gameplayDurationThresholdSeconds;
+
+        [SerializeField, Tooltip("Invoked when gameplay result is reported and elapsed gameplay time is less than or equal to the threshold. Arguments are elapsed seconds and threshold seconds.")]
+        private GameplayDurationThresholdUnityEvent onGameplayDurationThresholdPassed = new GameplayDurationThresholdUnityEvent();
+
+        [SerializeField, Tooltip("Invoked when gameplay result is reported and elapsed gameplay time is greater than the threshold. Arguments are elapsed seconds and threshold seconds.")]
+        private GameplayDurationThresholdUnityEvent onGameplayDurationThresholdFailed = new GameplayDurationThresholdUnityEvent();
+
         [Header("Runtime Debug")]
         [SerializeField, Tooltip("All flow states for Inspector display only. This list is not used to drive state transitions.")]
         private GameState[] visibleStateSequence = (GameState[])StateSequence.Clone();
 
         [SerializeField, Tooltip("Current flow state. Runtime display only; do not edit during Play Mode.")]
         private GameState currentState = GameState.SystemInitializing;
+
+        [SerializeField, Tooltip("Current gameplay duration while running, or the last completed gameplay duration after result is reported. Runtime display only.")]
+        private float gameplayElapsedSeconds;
+
+        [SerializeField, Tooltip("Last completed gameplay duration in seconds. Runtime display only.")]
+        private float lastGameplayDurationSeconds;
 
         [Header("State Unity Events")]
         [SerializeField, Tooltip("Inspector events invoked after a legal state transition.")]
@@ -183,11 +208,25 @@ namespace RFIDBaggage.Core
         private bool gameplayStartConfirmInputEnabled;
         private int gameplayStartConfirmKeyDownCount;
         private bool gameplayStartConfirmKeyDownCountCompleted;
+        private float idleEnteredTime = float.NegativeInfinity;
+        private float gameplayStartedTime = float.NegativeInfinity;
+        private bool gameplayTimerRunning;
 
         public IReadOnlyList<GameState> AllStates => ReadOnlyStateSequence;
         public GameState CurrentState => currentState;
         public LevelConfig CurrentLevel => currentLevel;
         public GameFlowConfirmKey ConfirmKey => confirmKey;
+        public float IdleLevelInputBlockSeconds => videoSystemConfig != null
+            ? Mathf.Max(0f, videoSystemConfig.IdleLevelInputBlockSeconds)
+            : 0f;
+        public float IdleLevelInputBlockElapsedSeconds => currentState == GameState.Idle
+            ? Mathf.Max(0f, Time.unscaledTime - idleEnteredTime)
+            : 0f;
+        public bool IsIdleLevelInputBlocked => currentState == GameState.Idle &&
+            IdleLevelInputBlockElapsedSeconds < IdleLevelInputBlockSeconds;
+        public float IdleLevelInputBlockProgress => IdleLevelInputBlockSeconds > 0f
+            ? Mathf.Clamp01(IdleLevelInputBlockElapsedSeconds / IdleLevelInputBlockSeconds)
+            : 1f;
         public bool RequireGameplayStartConfirmKeyDownCount => requireGameplayStartConfirmKeyDownCount;
         public int GameplayStartConfirmRequiredKeyDownCount => Mathf.Max(0, gameplayStartConfirmRequiredKeyDownCount);
         public float GameplayStartConfirmInputDelaySeconds => Mathf.Max(0f, gameplayStartConfirmInputDelaySeconds);
@@ -200,6 +239,10 @@ namespace RFIDBaggage.Core
         public float GameplayStartConfirmKeyDownProgress => GameplayStartConfirmRequiredKeyDownCount > 0
             ? Mathf.Clamp01((float)gameplayStartConfirmKeyDownCount / GameplayStartConfirmRequiredKeyDownCount)
             : 1f;
+        public float GameplayDurationThresholdSeconds => Mathf.Max(0f, gameplayDurationThresholdSeconds);
+        public float GameplayElapsedSeconds => gameplayTimerRunning ? gameplayElapsedSeconds : lastGameplayDurationSeconds;
+        public float LastGameplayDurationSeconds => lastGameplayDurationSeconds;
+        public bool GameplayTimerRunning => gameplayTimerRunning;
 
         [Obsolete("Use RequireGameplayStartConfirmKeyDownCount.")]
         public bool RequireGameplayStartConfirmHold => RequireGameplayStartConfirmKeyDownCount;
@@ -220,6 +263,8 @@ namespace RFIDBaggage.Core
         public event Action GameplayStartConfirmKeyDown;
         public event Action<int, int> GameplayStartConfirmKeyDownCountChanged;
         public event Action GameplayStartConfirmKeyDownCountCompleted;
+        public event Action<float, float> GameplayDurationThresholdPassed;
+        public event Action<float, float> GameplayDurationThresholdFailed;
         [Obsolete("Gameplay start confirm no longer tracks key release.")]
         public event Action GameplayStartConfirmKeyUp
         {
@@ -291,6 +336,7 @@ namespace RFIDBaggage.Core
             visibleStateSequence = (GameState[])StateSequence.Clone();
             gameplayStartConfirmRequiredKeyDownCount = Mathf.Max(0, gameplayStartConfirmRequiredKeyDownCount);
             gameplayStartConfirmInputDelaySeconds = Mathf.Max(0f, gameplayStartConfirmInputDelaySeconds);
+            gameplayDurationThresholdSeconds = Mathf.Max(0f, gameplayDurationThresholdSeconds);
         }
 
         private void Start()
@@ -305,6 +351,11 @@ namespace RFIDBaggage.Core
 
         private void Update()
         {
+            if (gameplayTimerRunning)
+            {
+                gameplayElapsedSeconds = Mathf.Max(0f, Time.unscaledTime - gameplayStartedTime);
+            }
+
             if (currentState == GameState.GameplayStartPending)
             {
                 UpdateGameplayStartConfirmKeyDownCount();
@@ -318,6 +369,12 @@ namespace RFIDBaggage.Core
 
         public bool RequestStartLevelByRfid(string rfidId)
         {
+            if (IsIdleLevelInputBlocked)
+            {
+                Debug.LogWarning($"[GameFlow] Ignored RFID input during Idle input lockout. Remaining: {IdleLevelInputBlockSeconds - IdleLevelInputBlockElapsedSeconds:0.###}s.", this);
+                return false;
+            }
+
             if (levelDatabase == null)
             {
                 Debug.LogWarning("[GameFlow] Cannot start level by RFID because LevelDatabase is not assigned.", this);
@@ -338,6 +395,12 @@ namespace RFIDBaggage.Core
             if (currentState != GameState.Idle)
             {
                 Debug.LogWarning($"[GameFlow] Cannot start a new level while state is {currentState}.", this);
+                return false;
+            }
+
+            if (IsIdleLevelInputBlocked)
+            {
+                Debug.LogWarning($"[GameFlow] Ignored level input during Idle input lockout. Remaining: {IdleLevelInputBlockSeconds - IdleLevelInputBlockElapsedSeconds:0.###}s.", this);
                 return false;
             }
 
@@ -463,6 +526,30 @@ namespace RFIDBaggage.Core
             ResetAndReturnToIdle();
         }
 
+        public void NotifyGameplayOperableStarted()
+        {
+            if (currentState != GameState.Gameplay)
+            {
+                Debug.LogWarning($"[GameFlow] Ignored gameplay operable notification while state is {currentState}. Expected {GameState.Gameplay}.", this);
+                return;
+            }
+
+            if (resultLocked)
+            {
+                Debug.LogWarning("[GameFlow] Ignored gameplay operable notification after result was already reported.", this);
+                return;
+            }
+
+            if (gameplayTimerRunning)
+            {
+                Debug.LogWarning("[GameFlow] Gameplay timer is already running.", this);
+                return;
+            }
+
+            StartGameplayTimer();
+            Debug.Log("[GameFlow] Gameplay timer started after gameplay became operable.", this);
+        }
+
         private void NotifyGameResult(bool success)
         {
             if (currentState != GameState.Gameplay)
@@ -480,8 +567,10 @@ namespace RFIDBaggage.Core
             resultLocked = true;
             string result = success ? "Success" : "Failure";
             string levelId = currentLevel != null ? currentLevel.LevelId : "<none>";
+            float gameplayDurationSeconds = StopGameplayTimer();
 
-            Debug.Log($"[GameFlow] {levelId} Result: {result}", this);
+            Debug.Log($"[GameFlow] {levelId} Result: {result}. Gameplay duration: {gameplayDurationSeconds:0.###}s.", this);
+            InvokeGameplayDurationThresholdResult(gameplayDurationSeconds);
             InvokeLevelFinished(currentLevel, success);
             TransitionTo(success ? GameState.SuccessPreparing : GameState.FailurePreparing);
         }
@@ -616,6 +705,7 @@ namespace RFIDBaggage.Core
             {
                 currentLevel = null;
                 resultLocked = false;
+                CancelGameplayTimer();
                 InvokeLevelReset();
                 Debug.Log("[GameFlow] Reset complete. Returned to Idle.", this);
                 return;
@@ -633,6 +723,7 @@ namespace RFIDBaggage.Core
 
             currentLevel = null;
             resultLocked = false;
+            CancelGameplayTimer();
             InvokeLevelReset();
 
             logResetCompleteWhenIdle = true;
@@ -659,10 +750,21 @@ namespace RFIDBaggage.Core
             {
                 ResetGameplayStartConfirmKeyDownCountState();
             }
-            else if (previousState == GameState.GameplayStartPending)
+
+            if (previousState == GameState.GameplayStartPending)
             {
                 ResetGameplayStartConfirmInputDelay();
                 ResetGameplayStartConfirmKeyDownCount();
+            }
+
+            if (nextState == GameState.Idle)
+            {
+                idleEnteredTime = Time.unscaledTime;
+            }
+
+            if (nextState == GameState.Gameplay)
+            {
+                PrepareGameplayTimer();
             }
 
             Debug.Log($"[GameFlow] {previousState} -> {nextState}", this);
@@ -683,6 +785,54 @@ namespace RFIDBaggage.Core
             }
 
             return true;
+        }
+
+        private void PrepareGameplayTimer()
+        {
+            gameplayStartedTime = float.NegativeInfinity;
+            gameplayElapsedSeconds = 0f;
+            lastGameplayDurationSeconds = 0f;
+            gameplayTimerRunning = false;
+        }
+
+        private void StartGameplayTimer()
+        {
+            gameplayStartedTime = Time.unscaledTime;
+            gameplayElapsedSeconds = 0f;
+            lastGameplayDurationSeconds = 0f;
+            gameplayTimerRunning = true;
+        }
+
+        private float StopGameplayTimer()
+        {
+            if (!gameplayTimerRunning)
+            {
+                return lastGameplayDurationSeconds;
+            }
+
+            lastGameplayDurationSeconds = Mathf.Max(0f, Time.unscaledTime - gameplayStartedTime);
+            gameplayElapsedSeconds = lastGameplayDurationSeconds;
+            gameplayTimerRunning = false;
+            return lastGameplayDurationSeconds;
+        }
+
+        private void CancelGameplayTimer()
+        {
+            gameplayStartedTime = float.NegativeInfinity;
+            gameplayTimerRunning = false;
+        }
+
+        private void InvokeGameplayDurationThresholdResult(float elapsedSeconds)
+        {
+            float thresholdSeconds = GameplayDurationThresholdSeconds;
+            bool passed = thresholdSeconds <= 0f || elapsedSeconds <= thresholdSeconds;
+            if (passed)
+            {
+                InvokeGameplayDurationThresholdPassed(elapsedSeconds, thresholdSeconds);
+                return;
+            }
+
+            InvokeGameplayDurationThresholdFailed(elapsedSeconds, thresholdSeconds);
         }
 
         private void InvokeStateChanged(GameState previousState, GameState nextState)
@@ -861,6 +1011,62 @@ namespace RFIDBaggage.Core
             catch (Exception exception)
             {
                 Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayStartConfirmKeyDownCountCompleted", exception), this);
+            }
+        }
+
+        private void InvokeGameplayDurationThresholdPassed(float elapsedSeconds, float thresholdSeconds)
+        {
+            Action<float, float> handlers = GameplayDurationThresholdPassed;
+            if (handlers != null)
+            {
+                foreach (Action<float, float> handler in handlers.GetInvocationList())
+                {
+                    try
+                    {
+                        handler.Invoke(elapsedSeconds, thresholdSeconds);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new Exception("[GameFlow] GameplayDurationThresholdPassed handler failed.", exception), this);
+                    }
+                }
+            }
+
+            try
+            {
+                onGameplayDurationThresholdPassed.Invoke(elapsedSeconds, thresholdSeconds);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayDurationThresholdPassed", exception), this);
+            }
+        }
+
+        private void InvokeGameplayDurationThresholdFailed(float elapsedSeconds, float thresholdSeconds)
+        {
+            Action<float, float> handlers = GameplayDurationThresholdFailed;
+            if (handlers != null)
+            {
+                foreach (Action<float, float> handler in handlers.GetInvocationList())
+                {
+                    try
+                    {
+                        handler.Invoke(elapsedSeconds, thresholdSeconds);
+                    }
+                    catch (Exception exception)
+                    {
+                        Debug.LogException(new Exception("[GameFlow] GameplayDurationThresholdFailed handler failed.", exception), this);
+                    }
+                }
+            }
+
+            try
+            {
+                onGameplayDurationThresholdFailed.Invoke(elapsedSeconds, thresholdSeconds);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(new Exception("[GameFlow] UnityEvent failed: onGameplayDurationThresholdFailed", exception), this);
             }
         }
 
