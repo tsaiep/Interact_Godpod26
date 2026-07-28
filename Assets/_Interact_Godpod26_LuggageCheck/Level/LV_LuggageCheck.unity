@@ -6970,6 +6970,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e12b6b055f086744b8c905a5520cbfcb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RFIDBaggage.Selection.SelectableItem
+--- !u!114 &380012339 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1890711859439471617, guid: 836e968dd9c9d4247a281ccd6e3048c9, type: 3}
+  m_PrefabInstance: {fileID: 1835644016}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6da43522623d4704e979466dc7650b65, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MoreMountains.Tools::MoreMountains.Feedbacks.MMF_Player
 --- !u!1 &382545722
 GameObject:
   m_ObjectHideFlags: 0
@@ -26285,7 +26296,7 @@ MonoBehaviour:
       onReset:
         m_PersistentCalls:
           m_Calls:
-          - m_Target: {fileID: 1852471779}
+          - m_Target: {fileID: 380012339}
             m_TargetAssemblyTypeName: MoreMountains.Feedbacks.MMF_Player, MoreMountains.Tools
             m_MethodName: PlayFeedbacks
             m_Mode: 1
@@ -26349,7 +26360,7 @@ MonoBehaviour:
       onReset:
         m_PersistentCalls:
           m_Calls:
-          - m_Target: {fileID: 1710421567}
+          - m_Target: {fileID: 1433060978}
             m_TargetAssemblyTypeName: MoreMountains.Feedbacks.MMF_Player, MoreMountains.Tools
             m_MethodName: PlayFeedbacks
             m_Mode: 1
@@ -30289,6 +30300,17 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1425672319}
   m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!114 &1433060978 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 1890711859439471617, guid: 836e968dd9c9d4247a281ccd6e3048c9, type: 3}
+  m_PrefabInstance: {fileID: 1282737295}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6da43522623d4704e979466dc7650b65, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: MoreMountains.Tools::MoreMountains.Feedbacks.MMF_Player
 --- !u!1 &1433578523
 GameObject:
   m_ObjectHideFlags: 0
