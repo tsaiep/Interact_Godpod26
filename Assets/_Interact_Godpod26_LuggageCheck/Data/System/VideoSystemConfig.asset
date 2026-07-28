@@ -17,5 +17,5 @@ MonoBehaviour:
   firstFrameTimeout: 5
   imageLoadTimeout: 10
   idleLoopSignalToIntroDelay: 1
-  idleLevelInputBlockSeconds: 5
+  idleLevelInputBlockSeconds: 4
   verboseVideoLogs: 0
