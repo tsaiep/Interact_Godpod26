@@ -7,7 +7,8 @@ namespace CabinPortraits.Video
     public enum CabinPortraitVideoSequenceKind
     {
         ManualInput,
-        Timer
+        Timer,
+        ManualChanceOverride
     }
 
     [CreateAssetMenu(
@@ -29,6 +30,12 @@ namespace CabinPortraits.Video
 
         [SerializeField, Tooltip("Timer-triggered video file paths relative to StreamingAssets. This list is independent from Video Relative Paths.")]
         private List<string> timerVideoRelativePaths = new List<string>();
+
+        [SerializeField, Tooltip("Optional third manual button video file paths relative to StreamingAssets. Accepted button requests can play one item from this list instead of Video Relative Paths based on Chance Video Trigger Probability.")]
+        private List<string> chanceVideoRelativePaths = new List<string>();
+
+        [SerializeField, Range(0f, 1f), Tooltip("Probability for each accepted manual button request to play from Chance Video Relative Paths instead of Video Relative Paths. 0 disables the chance override; 1 always uses it when paths are available.")]
+        private float chanceVideoTriggerProbability;
 
         [SerializeField, Min(0), Tooltip("First manual video index used after the scene enters the initial static screen.")]
         private int startIndex;
@@ -60,8 +67,10 @@ namespace CabinPortraits.Video
 
         public IReadOnlyList<string> VideoRelativePaths => videoRelativePaths;
         public IReadOnlyList<string> TimerVideoRelativePaths => timerVideoRelativePaths;
+        public IReadOnlyList<string> ChanceVideoRelativePaths => chanceVideoRelativePaths;
         public int StartIndex => Mathf.Clamp(startIndex, 0, Mathf.Max(0, VideoCount - 1));
         public int TimerStartIndex => Mathf.Clamp(timerStartIndex, 0, Mathf.Max(0, TimerVideoCount - 1));
+        public float ChanceVideoTriggerProbability => Mathf.Clamp01(chanceVideoTriggerProbability);
         public bool PlayOnStart => playOnStart;
         public float PrepareWarningTimeout => prepareWarningTimeout;
         public float FirstFrameWarningTimeout => firstFrameWarningTimeout;
@@ -71,6 +80,7 @@ namespace CabinPortraits.Video
         public bool VerboseLogs => verboseLogs;
         public int VideoCount => videoRelativePaths != null ? videoRelativePaths.Count : 0;
         public int TimerVideoCount => timerVideoRelativePaths != null ? timerVideoRelativePaths.Count : 0;
+        public int ChanceVideoCount => chanceVideoRelativePaths != null ? chanceVideoRelativePaths.Count : 0;
 
         public bool TryGetVideoPath(int index, out string relativePath)
         {
@@ -121,17 +131,44 @@ namespace CabinPortraits.Video
 
         public int GetStartIndex(CabinPortraitVideoSequenceKind sequenceKind)
         {
-            return sequenceKind == CabinPortraitVideoSequenceKind.Timer ? TimerStartIndex : StartIndex;
+            switch (sequenceKind)
+            {
+                case CabinPortraitVideoSequenceKind.Timer:
+                    return TimerStartIndex;
+                case CabinPortraitVideoSequenceKind.ManualChanceOverride:
+                    return 0;
+                case CabinPortraitVideoSequenceKind.ManualInput:
+                default:
+                    return StartIndex;
+            }
         }
 
         public int GetVideoCount(CabinPortraitVideoSequenceKind sequenceKind)
         {
-            return sequenceKind == CabinPortraitVideoSequenceKind.Timer ? TimerVideoCount : VideoCount;
+            switch (sequenceKind)
+            {
+                case CabinPortraitVideoSequenceKind.Timer:
+                    return TimerVideoCount;
+                case CabinPortraitVideoSequenceKind.ManualChanceOverride:
+                    return ChanceVideoCount;
+                case CabinPortraitVideoSequenceKind.ManualInput:
+                default:
+                    return VideoCount;
+            }
         }
 
         private List<string> GetPaths(CabinPortraitVideoSequenceKind sequenceKind)
         {
-            return sequenceKind == CabinPortraitVideoSequenceKind.Timer ? timerVideoRelativePaths : videoRelativePaths;
+            switch (sequenceKind)
+            {
+                case CabinPortraitVideoSequenceKind.Timer:
+                    return timerVideoRelativePaths;
+                case CabinPortraitVideoSequenceKind.ManualChanceOverride:
+                    return chanceVideoRelativePaths;
+                case CabinPortraitVideoSequenceKind.ManualInput:
+                default:
+                    return videoRelativePaths;
+            }
         }
 
         private void OnValidate()
@@ -146,8 +183,14 @@ namespace CabinPortraits.Video
                 timerVideoRelativePaths = new List<string>();
             }
 
+            if (chanceVideoRelativePaths == null)
+            {
+                chanceVideoRelativePaths = new List<string>();
+            }
+
             startIndex = Mathf.Max(0, startIndex);
             timerStartIndex = Mathf.Max(0, timerStartIndex);
+            chanceVideoTriggerProbability = Mathf.Clamp01(chanceVideoTriggerProbability);
             prepareWarningTimeout = Mathf.Max(0.1f, prepareWarningTimeout);
             firstFrameWarningTimeout = Mathf.Max(0.1f, firstFrameWarningTimeout);
             transitionCoverDelay = Mathf.Max(0f, transitionCoverDelay);
