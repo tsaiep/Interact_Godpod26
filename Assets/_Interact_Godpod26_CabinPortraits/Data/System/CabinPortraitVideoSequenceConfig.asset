@@ -24,6 +24,9 @@ MonoBehaviour:
   - CabinPortraits/Videos/TimerVideo_02.mp4
   - CabinPortraits/Videos/TimerVideo_03.mp4
   - CabinPortraits/Videos/TimerVideo_04.mp4
+  - CabinPortraits/Videos/TimerVideo_05.mp4
+  - CabinPortraits/Videos/TimerVideo_06.mp4
+  - CabinPortraits/Videos/TimerVideo_07.mp4
   chanceVideoRelativePaths:
   - CabinPortraits/Videos/Video_06.mp4
   chanceVideoTriggerProbability: 0.5
@@ -34,5 +37,5 @@ MonoBehaviour:
   firstFrameWarningTimeout: 10
   transitionCoverDelay: 1
   transitionTriggerBeforeVideoEnd: 1
-  timerVideoDelay: 10
+  timerVideoDelay: 5
   verboseLogs: 1
