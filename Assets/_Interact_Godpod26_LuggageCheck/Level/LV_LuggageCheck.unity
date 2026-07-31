@@ -620,7 +620,7 @@ MonoBehaviour:
         Label: AudioSource Volume Ch0
         OriginalLabel: AudioSource Volume
         ChannelMode: 0
-        Channel: 0
+        Channel: 9
         MMChannelDefinition: {fileID: 0}
         Chance: 100
         Timing:
@@ -7719,7 +7719,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: MoreMountains.Tools::MoreMountains.Feedbacks.MMAudioSourceVolumeShaker
   ChannelMode: 0
-  Channel: 0
+  Channel: 9
   MMChannelDefinition: {fileID: 0}
   ShakeDuration: 2
   PlayOnAwake: 0
