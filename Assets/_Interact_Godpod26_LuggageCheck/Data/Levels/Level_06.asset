@@ -15,7 +15,8 @@ MonoBehaviour:
   levelId: Level_06
   displayName: Test Level 06
   rfidId: 6
-  additionalRfidIds: []
+  additionalRfidIds:
+  - 2661640885
   introVideoRelativePath: LuggageCheck/Videos/Level06/Level06_Intro.mp4
   gameplayVideoRelativePath: LuggageCheck/Videos/Level06/Level06_Gameplay.mp4
   successVideoRelativePath: LuggageCheck/Videos/Level06/Level06_Success.mp4
