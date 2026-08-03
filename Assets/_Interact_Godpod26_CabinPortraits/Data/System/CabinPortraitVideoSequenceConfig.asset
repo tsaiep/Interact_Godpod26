@@ -18,6 +18,7 @@ MonoBehaviour:
   - CabinPortraits/Videos/Video_03.mp4
   - CabinPortraits/Videos/Video_04.mp4
   - CabinPortraits/Videos/Video_05.mp4
+  - CabinPortraits/Videos/Video_06.mp4
   timerVideoRelativePaths:
   - CabinPortraits/Videos/TimerVideo_01.mp4
   - CabinPortraits/Videos/TimerVideo_02.mp4
