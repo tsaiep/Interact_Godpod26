@@ -55,7 +55,7 @@ public sealed class BlurWeightControlRendererFeature : ScriptableRendererFeature
         // Specify when the effect will execute during the frame.
         // For a post-processing effect, the injection point is usually BeforeRenderingTransparents, BeforeRenderingPostProcessing, or AfterRenderingPostProcessing.
         // For more information, refer to https://docs.unity3d.com/Manual/urp/customize/custom-pass-injection-points.html 
-        m_FullScreenPass.renderPassEvent = RenderPassEvent.AfterRenderingPostProcessing;
+        m_FullScreenPass.renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
 
         // Specify that the effect doesn't need scene depth, normals, motion vectors, or the color texture as input.
         m_FullScreenPass.ConfigureInput(ScriptableRenderPassInput.None);
