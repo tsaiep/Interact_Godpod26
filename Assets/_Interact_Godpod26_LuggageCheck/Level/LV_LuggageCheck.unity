@@ -37392,7 +37392,7 @@ MonoBehaviour:
           m_Calls:
           - m_Target: {fileID: 282552744}
             m_TargetAssemblyTypeName: MoreMountains.Feedbacks.MMF_Player, MoreMountains.Tools
-            m_MethodName: PauseFeedbacks
+            m_MethodName: PlayFeedbacks
             m_Mode: 1
             m_Arguments:
               m_ObjectArgument: {fileID: 0}
