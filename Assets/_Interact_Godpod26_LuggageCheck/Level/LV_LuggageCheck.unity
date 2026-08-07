@@ -31824,7 +31824,7 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
-  gameplayDurationThresholdSeconds: 3
+  gameplayDurationThresholdSeconds: 4
   onGameplayDurationThresholdPassed:
     m_PersistentCalls:
       m_Calls:
