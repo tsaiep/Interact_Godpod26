@@ -38,4 +38,5 @@ MonoBehaviour:
   transitionCoverDelay: 1
   transitionTriggerBeforeVideoEnd: 1
   timerVideoDelay: 5
+  timerVideoInterruptDelay: 0.333
   verboseLogs: 1

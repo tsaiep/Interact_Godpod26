@@ -205,6 +205,9 @@ namespace CabinPortraits.Video
         [FormerlySerializedAs("onAutoSwitchRequested")]
         private CabinPortraitVideoSwitchEvent onTimerVideoRequested = new CabinPortraitVideoSwitchEvent();
 
+        [SerializeField, Tooltip("Invoked when a manual input interrupts a playing timer video. Arg: interrupted timer video index.")]
+        private CabinPortraitVideoIndexEvent onTimerVideoInterruptRequested = new CabinPortraitVideoIndexEvent();
+
         [SerializeField, Tooltip("Invoked when a manual button video reaches the configured remaining seconds before end.")]
         [FormerlySerializedAs("onTransitionStarted")]
         private UnityEvent onManualTransitionStarted = new UnityEvent();
@@ -291,6 +294,7 @@ namespace CabinPortraits.Video
         private PlayerSlotState inactiveSlot;
         private Coroutine startupCoroutine;
         private Coroutine switchCoroutine;
+        private Coroutine timerVideoInterruptCoroutine;
         private int tokenCounter;
         private int currentIndex = -1;
         private int nextManualIndex;
@@ -317,7 +321,7 @@ namespace CabinPortraits.Video
         public bool IsInitialized => initialized;
         public bool IsSwitching => isSwitching;
         public bool IsPlaybackActive => currentState == FlowState.ManualVideoPlaying || currentState == FlowState.TimerVideoPlaying;
-        public bool CanSwitch => CanAcceptSwitchRequest(CabinPortraitSwitchRequestSource.ManualInput, out _);
+        public bool CanSwitch => CanAcceptSwitchRequest(CabinPortraitSwitchRequestSource.ManualInput, out _) || CanInterruptTimerVideo(out _);
 
         public event Action<FlowState, FlowState> StateChanged;
 
@@ -373,6 +377,7 @@ namespace CabinPortraits.Video
             Unsubscribe(timerVideoPlayerB);
             StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
+            StopCoroutineIfRunning(ref timerVideoInterruptCoroutine);
             RestorePrimingAudioForSlots();
         }
 
@@ -390,6 +395,7 @@ namespace CabinPortraits.Video
 
             StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
+            StopCoroutineIfRunning(ref timerVideoInterruptCoroutine);
             StopAllSlots();
 
             initialized = true;
@@ -431,6 +437,7 @@ namespace CabinPortraits.Video
             EnterStateDirectly(FlowState.SystemInitializing);
             StopCoroutineIfRunning(ref startupCoroutine);
             StopCoroutineIfRunning(ref switchCoroutine);
+            StopCoroutineIfRunning(ref timerVideoInterruptCoroutine);
             StopAllSlots();
             SetInputLocked(false);
 
@@ -463,6 +470,12 @@ namespace CabinPortraits.Video
 
         private bool RequestNextVideo(CabinPortraitSwitchRequestSource source)
         {
+            if (source == CabinPortraitSwitchRequestSource.ManualInput &&
+                CanInterruptTimerVideo(out _))
+            {
+                return RequestTimerVideoInterrupt();
+            }
+
             if (!CanAcceptSwitchRequest(source, out string rejectionReason))
             {
                 if (ShouldLog)
@@ -481,6 +494,85 @@ namespace CabinPortraits.Video
             ClearTimerVideoSchedule();
             switchCoroutine = StartCoroutine(PlaySingleVideoRoutine(source, sequenceKind, nextIndex));
             return true;
+        }
+
+        private bool RequestTimerVideoInterrupt()
+        {
+            if (!CanInterruptTimerVideo(out string rejectionReason))
+            {
+                if (ShouldLog)
+                {
+                    Debug.Log($"[CabinPortraits.Video] Ignored timer video interrupt. {rejectionReason}", this);
+                }
+
+                onInputRejected.Invoke(rejectionReason);
+                return false;
+            }
+
+            int interruptedIndex = currentIndex;
+            ClearTimerVideoSchedule();
+            onTimerVideoInterruptRequested.Invoke(interruptedIndex);
+            timerVideoInterruptCoroutine = StartCoroutine(InterruptTimerVideoThenPlayManualRoutine(interruptedIndex));
+            return true;
+        }
+
+        private IEnumerator InterruptTimerVideoThenPlayManualRoutine(int interruptedIndex)
+        {
+            PlayerSlotState interruptedSlot = activeSlot;
+            int interruptedToken = interruptedSlot != null ? interruptedSlot.Token : 0;
+            float interruptDelay = sequenceConfig != null ? sequenceConfig.TimerVideoInterruptDelay : 0f;
+
+            if (ShouldLog)
+            {
+                Debug.Log(
+                    $"[CabinPortraits.Video] Timer video interrupt requested for index {interruptedIndex}. " +
+                    $"Waiting {interruptDelay:0.##} seconds before starting manual playback.",
+                    this);
+            }
+
+            if (interruptDelay > 0f)
+            {
+                yield return new WaitForSecondsRealtime(interruptDelay);
+            }
+
+            if (currentState == FlowState.TimerVideoPlaying && activeRequestSource == CabinPortraitSwitchRequestSource.Auto)
+            {
+                StopCoroutineIfRunning(ref switchCoroutine);
+
+                if (interruptedSlot != null && interruptedSlot.Token == interruptedToken)
+                {
+                    StopSlot(interruptedSlot);
+                }
+                else
+                {
+                    StopAllSlots();
+                }
+
+                ShowInitialDisplay();
+                currentIndex = -1;
+                isSwitching = false;
+                activeRequestSource = CabinPortraitSwitchRequestSource.ManualInput;
+                EnterStateDirectly(FlowState.Initial);
+                SetInputLocked(false);
+            }
+            else
+            {
+                while (initialized &&
+                       currentState != FlowState.Initial &&
+                       currentState != FlowState.ErrorRecovery)
+                {
+                    yield return null;
+                }
+            }
+
+            timerVideoInterruptCoroutine = null;
+
+            if (!initialized || currentState == FlowState.ErrorRecovery)
+            {
+                yield break;
+            }
+
+            RequestNextVideo(CabinPortraitSwitchRequestSource.ManualInput);
         }
 
         private IEnumerator PlaySingleVideoRoutine(
@@ -698,6 +790,49 @@ namespace CabinPortraits.Video
         {
             nextTimerVideoAt = -1f;
             lastTimerVideoDelay = -1f;
+        }
+
+        private bool CanInterruptTimerVideo(out string rejectionReason)
+        {
+            rejectionReason = string.Empty;
+
+            if (!initialized)
+            {
+                rejectionReason = "System is not initialized.";
+                return false;
+            }
+
+            if (sequenceConfig == null)
+            {
+                rejectionReason = "Sequence config is missing.";
+                return false;
+            }
+
+            if (!HasPlayableVideoPaths(CabinPortraitSwitchRequestSource.ManualInput))
+            {
+                rejectionReason = "manual sequence has no video paths.";
+                return false;
+            }
+
+            if (timerVideoInterruptCoroutine != null)
+            {
+                rejectionReason = "Timer video interrupt is already pending.";
+                return false;
+            }
+
+            if (currentState != FlowState.TimerVideoPlaying || activeRequestSource != CabinPortraitSwitchRequestSource.Auto)
+            {
+                rejectionReason = $"Flow state is {currentState}. Expected {FlowState.TimerVideoPlaying}.";
+                return false;
+            }
+
+            if (activeSlot == null || activeSlot.Player == null)
+            {
+                rejectionReason = "No active timer VideoPlayer is assigned.";
+                return false;
+            }
+
+            return true;
         }
 
         private bool CanAcceptSwitchRequest(CabinPortraitSwitchRequestSource source, out string rejectionReason)

@@ -62,6 +62,9 @@ namespace CabinPortraits.Video
         [FormerlySerializedAs("autoSwitchInterval")]
         private float timerVideoDelay = 60f;
 
+        [SerializeField, Min(0f), Tooltip("Seconds to wait after a manual input interrupts a timer video before stopping the timer video and starting the manual request.")]
+        private float timerVideoInterruptDelay = 1f;
+
         [SerializeField, Tooltip("When enabled, the video cycle outputs detailed Console logs.")]
         private bool verboseLogs = true;
 
@@ -77,6 +80,7 @@ namespace CabinPortraits.Video
         public float TransitionCoverDelay => transitionCoverDelay;
         public float TransitionTriggerBeforeVideoEnd => transitionTriggerBeforeVideoEnd;
         public float TimerVideoDelay => timerVideoDelay;
+        public float TimerVideoInterruptDelay => timerVideoInterruptDelay;
         public bool VerboseLogs => verboseLogs;
         public int VideoCount => videoRelativePaths != null ? videoRelativePaths.Count : 0;
         public int TimerVideoCount => timerVideoRelativePaths != null ? timerVideoRelativePaths.Count : 0;
@@ -196,6 +200,7 @@ namespace CabinPortraits.Video
             transitionCoverDelay = Mathf.Max(0f, transitionCoverDelay);
             transitionTriggerBeforeVideoEnd = Mathf.Max(0f, transitionTriggerBeforeVideoEnd);
             timerVideoDelay = Mathf.Max(0f, timerVideoDelay);
+            timerVideoInterruptDelay = Mathf.Max(0f, timerVideoInterruptDelay);
         }
     }
 }
